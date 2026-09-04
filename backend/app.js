@@ -13,10 +13,12 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 const loginRoute = require('./routes/loginRoutes');
 const postRoute = require('./routes/postRoute');
 const likeRoute = require('./routes/likeRoute');
+const leaderboardRoute = require('./routes/leaderboardRoute');
 
 app.use('/auth', loginRoute);
 app.use('/posts', postRoute);
 app.use('/likes', likeRoute);
+app.use('/leaderboard', leaderboardRoute);
 
 app.get('/', (req, res) => {
     res.json({ message: 'API is running' });
