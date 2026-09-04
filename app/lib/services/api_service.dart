@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config.dart';
+import '../models/leaderboard_entry.dart';
 import '../models/post.dart';
 
 /// Result of an API call: either data or an error message.
@@ -17,6 +18,21 @@ class ApiResult {
     required this.ok,
     required this.statusCode,
     this.data = const {},
+    this.message = '',
+  });
+}
+
+/// Result of a call that returns leaderboard rows.
+class LeaderboardResult {
+  final bool ok;
+  final int statusCode;
+  final List<LeaderboardEntry> entries;
+  final String message;
+
+  LeaderboardResult({
+    required this.ok,
+    required this.statusCode,
+    this.entries = const [],
     this.message = '',
   });
 }
@@ -342,6 +358,61 @@ class ApiService {
       return FeedResult(ok: false, statusCode: 0, message: 'Timed out');
     } catch (e) {
       return FeedResult(ok: false, statusCode: 0, message: 'Error: $e');
+    }
+  }
+
+  /// GET /leaderboard — top users by average likes per post.
+  ///
+  /// [minPosts] is the floor for appearing at all; the server defaults to
+  /// 2 so a single lucky post cannot top the board.
+  static Future<LeaderboardResult> getLeaderboard({
+    int limit = 5,
+    int minPosts = 1,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return LeaderboardResult(
+            ok: false, statusCode: 401, message: 'Not logged in');
+      }
+
+      final res = await http.get(
+        Uri.parse(
+            '${Config.baseUrl}/leaderboard?limit=$limit&minPosts=$minPosts'),
+        headers: {'Authorization': 'Bearer $token'},
+      ).timeout(const Duration(seconds: 20));
+
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        return LeaderboardResult(
+          ok: false,
+          statusCode: res.statusCode,
+          message: res.statusCode == 404
+              ? 'Leaderboard endpoint not found — is the server up to date?'
+              : 'Could not load leaderboard (${res.statusCode})',
+        );
+      }
+
+      final decoded = jsonDecode(res.body);
+      final List<dynamic> raw = decoded is List
+          ? decoded
+          : (decoded['leaderboard'] ?? decoded['data'] ?? []) as List<dynamic>;
+
+      return LeaderboardResult(
+        ok: true,
+        statusCode: res.statusCode,
+        entries: raw
+            .whereType<Map<String, dynamic>>()
+            .map(LeaderboardEntry.fromJson)
+            .toList(),
+      );
+    } on SocketException {
+      return LeaderboardResult(
+          ok: false, statusCode: 0, message: 'Cannot reach ${Config.baseUrl}');
+    } on TimeoutException {
+      return LeaderboardResult(
+          ok: false, statusCode: 0, message: 'Timed out');
+    } catch (e) {
+      return LeaderboardResult(ok: false, statusCode: 0, message: 'Error: $e');
     }
   }
 

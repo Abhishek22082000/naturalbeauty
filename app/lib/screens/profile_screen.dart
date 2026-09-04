@@ -23,6 +23,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _loading = true;
   String? _error;
 
+  /// Posts currently being deleted, so each tile can show its own spinner.
+  final Set<int> _deletingIds = {};
+
   @override
   void initState() {
     super.initState();
@@ -68,6 +71,56 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _user = user;
       _posts = feed?.posts ?? [];
     });
+  }
+
+  /// Confirms, then deletes. The server checks ownership regardless, so a
+  /// post that is not yours comes back 404 rather than being removed.
+  Future<void> _deletePost(Post post) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete post?'),
+        content: const Text('This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _deletingIds.add(post.id));
+
+    final result = await ApiService.deletePost(post.id);
+
+    if (!mounted) return;
+
+    if (result.ok) {
+      setState(() {
+        _deletingIds.remove(post.id);
+        _posts.removeWhere((p) => p.id == post.id);
+        // Keep the header count in step without a second round trip.
+        final current = _user?['post_count'];
+        if (current is int && current > 0) {
+          _user = {..._user!, 'post_count': current - 1};
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Post deleted')),
+      );
+    } else {
+      setState(() => _deletingIds.remove(post.id));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.message)),
+      );
+    }
   }
 
   /// The name shown in the app bar: full name if set, else the username.
@@ -202,6 +255,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         delegate: SliverChildBuilderDelegate(
                           (context, index) => _GridTile(
                             post: _posts[index],
+                            deleting:
+                                _deletingIds.contains(_posts[index].id),
+                            onDelete: () => _deletePost(_posts[index]),
                             onTap: () async {
                               await Navigator.of(context).push(
                                 MaterialPageRoute(
@@ -330,8 +386,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
 class _GridTile extends StatelessWidget {
   final Post post;
   final VoidCallback onTap;
+  final VoidCallback onDelete;
+  final bool deleting;
 
-  const _GridTile({required this.post, required this.onTap});
+  const _GridTile({
+    required this.post,
+    required this.onTap,
+    required this.onDelete,
+    this.deleting = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -340,17 +403,57 @@ class _GridTile extends StatelessWidget {
         : '${Config.baseUrl}${post.imageUrl}';
 
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        child: Image.network(
-          url,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stack) => Icon(
-            Icons.broken_image_outlined,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+      onTap: deleting ? null : onTap,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Container(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            child: Image.network(
+              url,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stack) => Icon(
+                Icons.broken_image_outlined,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
           ),
-        ),
+
+          // Scrim behind the icon so it stays legible on a light photo.
+          Positioned(
+            top: 0,
+            right: 0,
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topRight,
+                  end: Alignment.bottomLeft,
+                  colors: [Colors.black54, Colors.transparent],
+                ),
+              ),
+              child: deleting
+                  ? const Padding(
+                      padding: EdgeInsets.all(10),
+                      child: SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      ),
+                    )
+                  : IconButton(
+                      icon: const Icon(Icons.delete_outline),
+                      color: Colors.white,
+                      iconSize: 20,
+                      visualDensity: VisualDensity.compact,
+                      tooltip: 'Delete post',
+                      onPressed: onDelete,
+                    ),
+            ),
+          ),
+        ],
       ),
     );
   }

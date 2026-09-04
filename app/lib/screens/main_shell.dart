@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'create_post_screen.dart';
 import 'feed_screen.dart';
+import 'leaderboard_screen.dart';
 import 'profile_screen.dart';
 
-/// Holds the tabs: the feed (other people's posts), create, and the
-/// profile (your own posts).
+/// Holds the tabs: the feed (other people's posts), create, the
+/// leaderboard, and the profile (your own posts).
 ///
 /// Create is a bottom-nav destination rather than a real tab — selecting
 /// it opens the camera screen and returns to whichever tab you were on,
@@ -29,7 +30,7 @@ class _MainShellState extends State<MainShell> {
     if (created == true && mounted) {
       setState(() {
         _refreshToken++;
-        _index = 2; // land on the profile, where the new post lives
+        _index = 3; // land on the profile, where the new post lives
       });
     }
   }
@@ -44,6 +45,7 @@ class _MainShellState extends State<MainShell> {
         children: [
           FeedScreen(key: ValueKey('feed_$_refreshToken')),
           const SizedBox.shrink(),
+          LeaderboardScreen(key: ValueKey('board_$_refreshToken')),
           ProfileScreen(key: ValueKey('profile_$_refreshToken')),
         ],
       ),
@@ -66,6 +68,11 @@ class _MainShellState extends State<MainShell> {
             icon: Icon(Icons.add_box_outlined),
             selectedIcon: Icon(Icons.add_box),
             label: 'Create',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.emoji_events_outlined),
+            selectedIcon: Icon(Icons.emoji_events),
+            label: 'Top',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),
