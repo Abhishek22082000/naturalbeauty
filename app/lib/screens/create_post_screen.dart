@@ -1,0 +1,199 @@
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import '../services/api_service.dart';
+
+class CreatePostScreen extends StatefulWidget {
+  const CreatePostScreen({super.key});
+
+  @override
+  State<CreatePostScreen> createState() => _CreatePostScreenState();
+}
+
+class _CreatePostScreenState extends State<CreatePostScreen> {
+  final _caption = TextEditingController();
+  final _location = TextEditingController();
+  final _picker = ImagePicker();
+
+  File? _image;
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _caption.dispose();
+    _location.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pick(ImageSource source) async {
+    try {
+      // maxWidth keeps uploads under the server's 5MB limit.
+      final picked = await _picker.pickImage(
+        source: source,
+        maxWidth: 1920,
+        imageQuality: 85,
+      );
+      if (picked == null) return;
+      setState(() {
+        _image = File(picked.path);
+        _error = null;
+      });
+    } catch (e) {
+      setState(() => _error = 'Could not open ${source.name}: $e');
+    }
+  }
+
+  Future<void> _submit() async {
+    if (_image == null) {
+      setState(() => _error = 'Pick an image first');
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    final result = await ApiService.createPost(
+      image: _image!,
+      caption: _caption.text.trim(),
+      location: _location.text.trim(),
+    );
+
+    if (!mounted) return;
+
+    if (result.ok) {
+      final postId = result.data['post']?['id'];
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            postId != null ? 'Posted — post ID $postId' : 'Post created',
+          ),
+        ),
+      );
+      Navigator.of(context).pop();
+    } else {
+      setState(() {
+        _loading = false;
+        _error = result.message;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Create post')),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AspectRatio(
+                aspectRatio: 1,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: _image == null
+                      ? const Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.image_outlined, size: 48),
+                              SizedBox(height: 8),
+                              Text('No image selected'),
+                            ],
+                          ),
+                        )
+                      : Image.file(_image!, fit: BoxFit.cover),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _loading
+                          ? null
+                          : () => _pick(ImageSource.camera),
+                      icon: const Icon(Icons.camera_alt_outlined),
+                      label: const Text('Camera'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _loading
+                          ? null
+                          : () => _pick(ImageSource.gallery),
+                      icon: const Icon(Icons.photo_library_outlined),
+                      label: const Text('Gallery'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              TextField(
+                controller: _caption,
+                maxLines: 3,
+                maxLength: 2200,
+                decoration: const InputDecoration(
+                  labelText: 'Caption',
+                  alignLabelWithHint: true,
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              TextField(
+                controller: _location,
+                decoration: const InputDecoration(
+                  labelText: 'Location',
+                  prefixIcon: Icon(Icons.location_on_outlined),
+                ),
+              ),
+
+              if (_error != null) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.errorContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    _error!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                    ),
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 24),
+              FilledButton(
+                onPressed: _loading ? null : _submit,
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                child: _loading
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Share'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

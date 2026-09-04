@@ -1,9 +1,4 @@
-const express = require('express');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
-const multer = require('multer');
 const connection = require('../config/connection');
-const app = express()
 
 const createPost = async (req, res) => {
     try {

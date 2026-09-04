@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The backend is plain HTTP on a LAN address. Android blocks cleartext
+  traffic by default since API 28, so it must be allowed explicitly.
+  Remove this once the API is served over HTTPS.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true"/>
+</network-security-config>
