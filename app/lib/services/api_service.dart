@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config.dart';
+import '../models/post.dart';
 
 /// Result of an API call: either data or an error message.
 class ApiResult {
@@ -16,6 +17,21 @@ class ApiResult {
     required this.ok,
     required this.statusCode,
     this.data = const {},
+    this.message = '',
+  });
+}
+
+/// Result of a call that returns a list of posts.
+class FeedResult {
+  final bool ok;
+  final int statusCode;
+  final List<Post> posts;
+  final String message;
+
+  FeedResult({
+    required this.ok,
+    required this.statusCode,
+    this.posts = const [],
     this.message = '',
   });
 }
@@ -221,6 +237,69 @@ class ApiService {
       return _result(res);
     } catch (e) {
       return _networkError(e);
+    }
+  }
+
+  /// GET /posts/feed — all posts, newest first.
+  ///
+  /// This endpoint does NOT exist on the backend yet; `getPost` and
+  /// `getUserPost` are still empty stubs. Until it does, this returns a
+  /// failure and the feed screen falls back to placeholder posts.
+  ///
+  /// It accepts either shape, so no change is needed here when the
+  /// endpoint lands:
+  ///     [ {...}, {...} ]            a bare array
+  ///     { "posts": [ {...} ] }      wrapped in an object
+  static Future<FeedResult> getFeed() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return FeedResult(
+            ok: false, statusCode: 401, message: 'Not logged in');
+      }
+
+      final res = await http.get(
+        Uri.parse('${Config.baseUrl}/posts/feed'),
+        headers: {'Authorization': 'Bearer $token'},
+      ).timeout(const Duration(seconds: 20));
+
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        return FeedResult(
+          ok: false,
+          statusCode: res.statusCode,
+          message: res.statusCode == 404
+              ? 'GET /posts/feed returned 404 — the endpoint does not exist yet'
+              : 'Feed request failed (${res.statusCode})',
+        );
+      }
+
+      final decoded = jsonDecode(res.body);
+      final List<dynamic> raw = decoded is List
+          ? decoded
+          : (decoded['posts'] ?? decoded['data'] ?? []) as List<dynamic>;
+
+      return FeedResult(
+        ok: true,
+        statusCode: res.statusCode,
+        posts: raw
+            .whereType<Map<String, dynamic>>()
+            .map(Post.fromJson)
+            .toList(),
+      );
+    } on SocketException {
+      return FeedResult(
+        ok: false,
+        statusCode: 0,
+        message: 'Cannot reach ${Config.baseUrl}',
+      );
+    } on TimeoutException {
+      return FeedResult(
+        ok: false,
+        statusCode: 0,
+        message: 'Timed out reaching ${Config.baseUrl}',
+      );
+    } catch (e) {
+      return FeedResult(ok: false, statusCode: 0, message: 'Feed error: $e');
     }
   }
 

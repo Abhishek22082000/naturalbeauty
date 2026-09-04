@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'config.dart';
 import 'services/api_service.dart';
 import 'screens/login_screen.dart';
-import 'screens/home_screen.dart';
+import 'screens/feed_screen.dart';
 import 'screens/server_screen.dart';
 
 void main() {
@@ -87,6 +87,6 @@ class _LauncherState extends State<_Launcher> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    return _loggedIn ? const HomeScreen() : const LoginScreen();
+    return _loggedIn ? const FeedScreen() : const LoginScreen();
   }
 }
