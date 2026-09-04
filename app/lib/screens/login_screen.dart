@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../config.dart';
 import '../services/api_service.dart';
 import 'signup_screen.dart';
-import 'feed_screen.dart';
+import 'main_shell.dart';
 import 'server_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -45,7 +45,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (result.ok) {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const FeedScreen()),
+        MaterialPageRoute(builder: (_) => const MainShell()),
       );
     } else {
       setState(() {

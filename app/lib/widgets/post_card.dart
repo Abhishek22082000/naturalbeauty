@@ -10,7 +10,7 @@ class PostCard extends StatelessWidget {
   const PostCard({super.key, required this.post, this.onLikeToggle});
 
   /// Post images come back as server-relative paths ("/uploads/posts/x.jpg"),
-  /// so they need the base URL prepended. Mock data uses absolute URLs.
+  /// so they need the base URL prepended.
   String get _fullImageUrl {
     if (post.imageUrl.startsWith('http')) return post.imageUrl;
     return '${Config.baseUrl}${post.imageUrl}';
@@ -33,7 +33,7 @@ class PostCard extends StatelessWidget {
       children: [
         // ---------------------------------------------------- author row
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
           child: Row(
             children: [
               _Avatar(url: _fullAvatarUrl, username: post.username),
@@ -72,38 +72,9 @@ class PostCard extends StatelessWidget {
                           color: scheme.onSurfaceVariant,
                         ),
                         overflow: TextOverflow.ellipsis,
-                      )
-                    else
-                      Text(
-                        'Suggested for you',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
-                        overflow: TextOverflow.ellipsis,
                       ),
                   ],
                 ),
-              ),
-              TextButton(
-                onPressed: () {},
-                style: TextButton.styleFrom(
-                  minimumSize: const Size(0, 32),
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  visualDensity: VisualDensity.compact,
-                ),
-                child: const Text(
-                  'Follow',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF3897F0),
-                  ),
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.more_vert),
-                onPressed: () {},
-                tooltip: 'More',
-                visualDensity: VisualDensity.compact,
               ),
             ],
           ),
@@ -137,8 +108,7 @@ class PostCard extends StatelessWidget {
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 24),
                         child: Text(
-                          'Image failed to load.\nThe server needs '
-                          "app.use('/uploads', express.static('uploads'))",
+                          'Image unavailable',
                           textAlign: TextAlign.center,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: scheme.onSurfaceVariant,
@@ -166,22 +136,7 @@ class PostCard extends StatelessWidget {
                 ),
                 tooltip: post.isLiked ? 'Unlike' : 'Like',
               ),
-              IconButton(
-                onPressed: () {},
-                icon: const Icon(Icons.mode_comment_outlined),
-                tooltip: 'Comment',
-              ),
-              IconButton(
-                onPressed: () {},
-                icon: const Icon(Icons.send_outlined),
-                tooltip: 'Share',
-              ),
               const Spacer(),
-              IconButton(
-                onPressed: () {},
-                icon: const Icon(Icons.bookmark_border),
-                tooltip: 'Save',
-              ),
             ],
           ),
         ),

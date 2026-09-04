@@ -4,8 +4,6 @@ import '../services/api_service.dart';
 import '../services/secure_screen.dart';
 import '../widgets/post_card.dart';
 import 'create_post_screen.dart';
-import 'server_screen.dart';
-import 'login_screen.dart';
 
 /// The dashboard: an Instagram-style feed of every post, newest first.
 ///
@@ -94,15 +92,6 @@ class _FeedScreenState extends State<FeedScreen> {
     }
   }
 
-  Future<void> _logout() async {
-    await ApiService.clearToken();
-    if (!mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-      (route) => false,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -121,21 +110,6 @@ class _FeedScreenState extends State<FeedScreen> {
               );
               _load();
             },
-          ),
-          IconButton(
-            icon: const Icon(Icons.dns_outlined),
-            tooltip: 'Server settings',
-            onPressed: () async {
-              await Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const ServerScreen()),
-              );
-              _load();
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Log out',
-            onPressed: _logout,
           ),
         ],
       ),

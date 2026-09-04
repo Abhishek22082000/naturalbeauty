@@ -303,6 +303,86 @@ class ApiService {
     }
   }
 
+  /// GET /posts/user/:userId — one user's posts, for the profile grid.
+  static Future<FeedResult> getUserPosts(int userId) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return FeedResult(ok: false, statusCode: 401, message: 'Not logged in');
+      }
+
+      final res = await http.get(
+        Uri.parse('${Config.baseUrl}/posts/user/$userId'),
+        headers: {'Authorization': 'Bearer $token'},
+      ).timeout(const Duration(seconds: 20));
+
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        return FeedResult(
+          ok: false,
+          statusCode: res.statusCode,
+          message: 'Could not load posts (${res.statusCode})',
+        );
+      }
+
+      final decoded = jsonDecode(res.body);
+      final List<dynamic> raw = decoded is List
+          ? decoded
+          : (decoded['posts'] ?? decoded['data'] ?? []) as List<dynamic>;
+
+      return FeedResult(
+        ok: true,
+        statusCode: res.statusCode,
+        posts:
+            raw.whereType<Map<String, dynamic>>().map(Post.fromJson).toList(),
+      );
+    } on SocketException {
+      return FeedResult(
+          ok: false, statusCode: 0, message: 'Cannot reach ${Config.baseUrl}');
+    } on TimeoutException {
+      return FeedResult(ok: false, statusCode: 0, message: 'Timed out');
+    } catch (e) {
+      return FeedResult(ok: false, statusCode: 0, message: 'Error: $e');
+    }
+  }
+
+  /// GET /auth/me — the logged-in user's profile.
+  static Future<ApiResult> getMe() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return ApiResult(ok: false, statusCode: 401, message: 'Not logged in');
+      }
+
+      final res = await http.get(
+        Uri.parse('${Config.baseUrl}/auth/me'),
+        headers: {'Authorization': 'Bearer $token'},
+      ).timeout(const Duration(seconds: 20));
+
+      return _result(res);
+    } catch (e) {
+      return _networkError(e);
+    }
+  }
+
+  /// DELETE /posts/:id — the server refuses posts that are not yours.
+  static Future<ApiResult> deletePost(int postId) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return ApiResult(ok: false, statusCode: 401, message: 'Not logged in');
+      }
+
+      final res = await http.delete(
+        Uri.parse('${Config.baseUrl}/posts/$postId'),
+        headers: {'Authorization': 'Bearer $token'},
+      ).timeout(const Duration(seconds: 20));
+
+      return _result(res);
+    } catch (e) {
+      return _networkError(e);
+    }
+  }
+
   // ------------------------------------------------------------- likes
 
   /// POST /likes/:id/like
