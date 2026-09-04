@@ -43,12 +43,27 @@ class PostCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      post.username,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                      overflow: TextOverflow.ellipsis,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            post.username,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (post.isVerified) ...[
+                          const SizedBox(width: 4),
+                          const Icon(
+                            Icons.verified,
+                            size: 15,
+                            color: Color(0xFF3897F0),
+                          ),
+                        ],
+                      ],
                     ),
                     if (post.location != null && post.location!.isNotEmpty)
                       Text(
@@ -57,14 +72,38 @@ class PostCard extends StatelessWidget {
                           color: scheme.onSurfaceVariant,
                         ),
                         overflow: TextOverflow.ellipsis,
+                      )
+                    else
+                      Text(
+                        'Suggested for you',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                   ],
+                ),
+              ),
+              TextButton(
+                onPressed: () {},
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(0, 32),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  visualDensity: VisualDensity.compact,
+                ),
+                child: const Text(
+                  'Follow',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF3897F0),
+                  ),
                 ),
               ),
               IconButton(
                 icon: const Icon(Icons.more_vert),
                 onPressed: () {},
                 tooltip: 'More',
+                visualDensity: VisualDensity.compact,
               ),
             ],
           ),

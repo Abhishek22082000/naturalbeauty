@@ -29,6 +29,7 @@ class Post {
   final String? location;
   final int likeCount;
   final bool isLiked;
+  final bool isVerified;
   final DateTime? createdAt;
 
   const Post({
@@ -42,6 +43,7 @@ class Post {
     this.location,
     this.likeCount = 0,
     this.isLiked = false,
+    this.isVerified = false,
     this.createdAt,
   });
 
@@ -58,6 +60,7 @@ class Post {
       likeCount: _toInt(json['like_count']),
       // MySQL sends 0/1, not true/false — never compare with == true.
       isLiked: _toInt(json['is_liked']) == 1,
+      isVerified: _toInt(json['is_verified']) == 1,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
           : null,
@@ -83,6 +86,7 @@ class Post {
       location: location,
       likeCount: likeCount ?? this.likeCount,
       isLiked: isLiked ?? this.isLiked,
+      isVerified: isVerified,
       createdAt: createdAt,
     );
   }
@@ -111,6 +115,7 @@ class MockPosts {
         userId: 1,
         username: 'priya_shah',
         fullName: 'Priya Shah',
+        isVerified: true,
         imageUrl: 'https://picsum.photos/seed/nb1/800/800',
         caption: 'Morning light through the tea gardens. Worth the 5am start.',
         location: 'Munnar, Kerala',
@@ -147,6 +152,7 @@ class MockPosts {
         userId: 4,
         username: 'dev.rawat',
         fullName: 'Dev Rawat',
+        isVerified: true,
         imageUrl: 'https://picsum.photos/seed/nb4/800/900',
         caption: 'Monsoon finally here 🌧️',
         location: 'Mumbai',
