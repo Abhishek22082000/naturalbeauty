@@ -2,6 +2,12 @@
     <!-- Needed to reach the backend over the local network -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.CAMERA"/>
+    <!-- Android 13+ uses READ_MEDIA_IMAGES; older versions READ_EXTERNAL_STORAGE -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32"/>
+
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
 
     <application
         android:label="NaturalBeauty"

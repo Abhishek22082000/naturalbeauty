@@ -36,8 +36,11 @@ jobs:
           cp pubspec.yaml /tmp/pubspec.yaml
           mkdir -p /tmp/keep
           cp -r android /tmp/keep/android
-          flutter create --project-name naturalbeauty --platforms=android .
+          flutter create --project-name naturalbeauty             --org com.example --platforms=android .
           cp /tmp/pubspec.yaml pubspec.yaml
+          # Drop the generated MainActivity so ours (with the FLAG_SECURE
+          # method channel) is the only one, then restore our android files.
+          rm -rf android/app/src/main/kotlin
           cp -rf /tmp/keep/android/. android/
 
       - name: Install dependencies

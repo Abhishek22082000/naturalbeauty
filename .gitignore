@@ -41,7 +41,6 @@ app/android/*.properties
 app/android/app/build.gradle*
 app/android/build.gradle*
 app/android/settings.gradle*
-app/android/app/src/main/kotlin/
 app/android/app/src/main/java/
 app/android/app/src/debug/
 app/android/app/src/profile/

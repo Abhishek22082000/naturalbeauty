@@ -91,7 +91,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              AspectRatio(
+              GestureDetector(
+                onTap: _loading || _image != null
+                    ? null
+                    : () => _pick(ImageSource.camera),
+                child: AspectRatio(
                 aspectRatio: 1,
                 child: Container(
                   decoration: BoxDecoration(
@@ -104,13 +108,14 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.image_outlined, size: 48),
+                              Icon(Icons.camera_alt_outlined, size: 48),
                               SizedBox(height: 8),
-                              Text('No image selected'),
+                              Text('Tap to take a photo'),
                             ],
                           ),
                         )
                       : Image.file(_image!, fit: BoxFit.cover),
+                ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -118,12 +123,15 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton.icon(
+                    child: FilledButton.icon(
                       onPressed: _loading
                           ? null
                           : () => _pick(ImageSource.camera),
-                      icon: const Icon(Icons.camera_alt_outlined),
-                      label: const Text('Camera'),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      icon: const Icon(Icons.camera_alt),
+                      label: const Text('Take photo'),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -132,6 +140,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                       onPressed: _loading
                           ? null
                           : () => _pick(ImageSource.gallery),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
                       icon: const Icon(Icons.photo_library_outlined),
                       label: const Text('Gallery'),
                     ),

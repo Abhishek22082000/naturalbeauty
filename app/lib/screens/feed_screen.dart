@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import '../models/post.dart';
 import '../services/api_service.dart';
+import '../services/secure_screen.dart';
 import '../widgets/post_card.dart';
 import 'create_post_screen.dart';
 import 'server_screen.dart';
 import 'login_screen.dart';
 
-/// The dashboard: an Instagram-style feed of posts.
+/// The dashboard: an Instagram-style feed of every post, newest first.
 ///
-/// The backend has no `GET /posts/feed` yet, so this falls back to mock
-/// posts and shows a banner saying so. When the endpoint exists, the
-/// fallback disappears on its own — no code change needed here.
+/// Screenshots are blocked while this screen is open (Android FLAG_SECURE)
+/// and re-enabled when it closes, so login and settings stay capturable.
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
 
@@ -21,13 +21,21 @@ class FeedScreen extends StatefulWidget {
 class _FeedScreenState extends State<FeedScreen> {
   List<Post> _posts = [];
   bool _loading = true;
-  bool _usingMockData = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
+    SecureScreen.enable();
     _load();
+  }
+
+  @override
+  void dispose() {
+    // The flag lives on the Activity, so it must be cleared or every other
+    // screen inherits the screenshot block.
+    SecureScreen.disable();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -40,22 +48,15 @@ class _FeedScreenState extends State<FeedScreen> {
 
     if (!mounted) return;
 
-    if (result.ok) {
-      setState(() {
+    setState(() {
+      _loading = false;
+      if (result.ok) {
         _posts = result.posts;
-        _usingMockData = false;
-        _loading = false;
-      });
-    } else {
-      // No feed endpoint yet (404), or the server is unreachable.
-      // Show the design with placeholder posts either way.
-      setState(() {
-        _posts = MockPosts.sample;
-        _usingMockData = true;
+        _error = null;
+      } else {
         _error = result.message;
-        _loading = false;
-      });
-    }
+      }
+    });
   }
 
   /// Optimistic like: flip the UI immediately, then call the API and roll
@@ -72,8 +73,6 @@ class _FeedScreenState extends State<FeedScreen> {
         likeCount: wasLiked ? post.likeCount - 1 : post.likeCount + 1,
       );
     });
-
-    if (_usingMockData) return; // nothing real to call
 
     final result = wasLiked
         ? await ApiService.unlikePost(post.id)
@@ -145,77 +144,107 @@ class _FeedScreenState extends State<FeedScreen> {
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: _load,
-              child: ListView.builder(
-                physics: const AlwaysScrollableScrollPhysics(),
-                itemCount: _posts.length + (_usingMockData ? 1 : 0),
-                itemBuilder: (context, index) {
-                  if (_usingMockData && index == 0) {
-                    return _MockBanner(error: _error);
-                  }
-                  final post = _posts[index - (_usingMockData ? 1 : 0)];
-                  return PostCard(
-                    post: post,
-                    onLikeToggle: () => _toggleLike(post),
-                  );
-                },
-              ),
+              child: _error != null
+                  ? _ErrorState(message: _error!, onRetry: _load)
+                  : _posts.isEmpty
+                      ? const _EmptyState()
+                      : ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          itemCount: _posts.length,
+                          itemBuilder: (context, index) {
+                            final post = _posts[index];
+                            return PostCard(
+                              post: post,
+                              onLikeToggle: () => _toggleLike(post),
+                            );
+                          },
+                        ),
             ),
     );
   }
 }
 
-/// Explains that these posts are placeholders, and what the server needs.
-class _MockBanner extends StatelessWidget {
-  final String? error;
+/// Shown when the feed request fails. Wrapped in a scrollable so pull to
+/// refresh still works with nothing on screen.
+class _ErrorState extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
 
-  const _MockBanner({this.error});
+  const _ErrorState({required this.message, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    return Container(
-      margin: const EdgeInsets.all(12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: scheme.tertiaryContainer,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.science_outlined,
-                  size: 20, color: scheme.onTertiaryContainer),
-              const SizedBox(width: 8),
-              Text(
-                'Showing sample posts',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: scheme.onTertiaryContainer,
-                    ),
-              ),
-            ],
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(height: MediaQuery.of(context).size.height * 0.2),
+        Icon(Icons.cloud_off, size: 56, color: scheme.onSurfaceVariant),
+        const SizedBox(height: 16),
+        Center(
+          child: Text(
+            "Couldn't load the feed",
+            style: Theme.of(context).textTheme.titleMedium,
           ),
-          const SizedBox(height: 8),
-          Text(
-            'The backend has no GET /posts/feed endpoint yet, so this is '
-            'placeholder data to show the layout. Real posts appear here '
-            'automatically once the endpoint exists.',
-            style: TextStyle(color: scheme.onTertiaryContainer, fontSize: 12),
+        ),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Text(
+            message,
+            textAlign: TextAlign.center,
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: scheme.onSurfaceVariant),
           ),
-          if (error != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              error!,
-              style: TextStyle(
-                color: scheme.onTertiaryContainer.withValues(alpha: 0.75),
-                fontSize: 11,
-              ),
-            ),
-          ],
-        ],
-      ),
+        ),
+        const SizedBox(height: 20),
+        Center(
+          child: FilledButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Try again'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Shown when the request succeeded but nobody has posted yet.
+class _EmptyState extends StatelessWidget {
+  const _EmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+        Icon(Icons.photo_camera_outlined,
+            size: 56, color: scheme.onSurfaceVariant),
+        const SizedBox(height: 16),
+        Center(
+          child: Text(
+            'No posts yet',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Center(
+          child: Text(
+            'Tap + to share the first one',
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+        ),
+      ],
     );
   }
 }
