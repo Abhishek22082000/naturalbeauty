@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../config.dart';
 import '../models/leaderboard_entry.dart';
 import '../services/api_service.dart';
-import '../services/secure_screen.dart';
 
 /// Top NaturalBeauty — users ranked by average likes per post.
 class LeaderboardScreen extends StatefulWidget {
@@ -20,14 +19,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
   @override
   void initState() {
     super.initState();
-    SecureScreen.enable();
     _load();
-  }
-
-  @override
-  void dispose() {
-    SecureScreen.disable();
-    super.dispose();
   }
 
   Future<void> _load() async {

@@ -70,18 +70,41 @@ class _LoginScreenState extends State<LoginScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(
-                      Icons.local_florist,
-                      size: 64,
-                      color: Theme.of(context).colorScheme.primary,
+                    Center(
+                      child: Container(
+                        height: 84,
+                        width: 84,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(26),
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Theme.of(context).colorScheme.primary,
+                              Theme.of(context).colorScheme.tertiary,
+                            ],
+                          ),
+                        ),
+                        child: const Icon(Icons.local_florist,
+                            size: 44, color: Colors.white),
+                      ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 20),
                     Text(
                       'NaturalBeauty',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.headlineMedium,
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Share what you see',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                    ),
+                    const SizedBox(height: 36),
 
                     TextFormField(
                       controller: _email,
@@ -118,16 +141,32 @@ class _LoginScreenState extends State<LoginScreen> {
                     if (_error != null) ...[
                       const SizedBox(height: 16),
                       Container(
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
                           color: Theme.of(context).colorScheme.errorContainer,
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Text(
-                          _error!,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onErrorContainer,
-                          ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.error_outline,
+                                size: 19,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onErrorContainer),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                _error!,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onErrorContainer,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -147,8 +186,35 @@ class _LoginScreenState extends State<LoginScreen> {
                           : const Text('Log in'),
                     ),
 
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(
+                            child: Divider(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .outlineVariant)),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Text(
+                            'or',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                            child: Divider(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .outlineVariant)),
+                      ],
+                    ),
                     const SizedBox(height: 12),
-                    TextButton(
+                    OutlinedButton(
                       onPressed: _loading
                           ? null
                           : () => Navigator.of(context).push(
@@ -156,7 +222,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   builder: (_) => const SignupScreen(),
                                 ),
                               ),
-                      child: const Text("Don't have an account? Sign up"),
+                      child: const Text('Create an account'),
                     ),
 
                     const SizedBox(height: 8),

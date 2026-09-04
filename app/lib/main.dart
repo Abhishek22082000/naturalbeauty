@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'config.dart';
+import 'theme.dart';
 import 'services/api_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_shell.dart';
@@ -17,14 +18,8 @@ class NaturalBeautyApp extends StatelessWidget {
     return MaterialApp(
       title: 'NaturalBeauty',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF7B4B94)),
-        useMaterial3: true,
-        inputDecorationTheme: const InputDecorationTheme(
-          border: OutlineInputBorder(),
-          filled: true,
-        ),
-      ),
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
       home: const _Launcher(),
     );
   }

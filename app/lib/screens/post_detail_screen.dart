@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/post.dart';
 import '../services/api_service.dart';
-import '../services/secure_screen.dart';
 import '../widgets/post_card.dart';
 
 /// A single post, opened by tapping a tile in the profile grid.
@@ -25,13 +24,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   void initState() {
     super.initState();
     _post = widget.post;
-    SecureScreen.enable();
-  }
-
-  @override
-  void dispose() {
-    SecureScreen.disable();
-    super.dispose();
   }
 
   Future<void> _toggleLike() async {

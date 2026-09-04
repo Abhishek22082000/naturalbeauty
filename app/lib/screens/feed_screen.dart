@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import '../models/post.dart';
 import '../services/api_service.dart';
-import '../services/secure_screen.dart';
 import '../widgets/post_card.dart';
 
 /// The dashboard: an Instagram-style feed of every post, newest first.
 ///
-/// Screenshots are blocked while this screen is open (Android FLAG_SECURE)
-/// and re-enabled when it closes, so login and settings stay capturable.
+/// Screenshot blocking for this tab is driven by MainShell, not here —
+/// IndexedStack keeps every tab mounted, so initState and dispose do not
+/// fire when tabs change.
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
 
@@ -23,16 +23,7 @@ class _FeedScreenState extends State<FeedScreen> {
   @override
   void initState() {
     super.initState();
-    SecureScreen.enable();
     _load();
-  }
-
-  @override
-  void dispose() {
-    // The flag lives on the Activity, so it must be cleared or every other
-    // screen inherits the screenshot block.
-    SecureScreen.disable();
-    super.dispose();
   }
 
   Future<void> _load() async {

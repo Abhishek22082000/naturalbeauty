@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/secure_screen.dart';
 import 'create_post_screen.dart';
 import 'feed_screen.dart';
 import 'leaderboard_screen.dart';
@@ -18,21 +19,56 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> {
-  int _index = 0;
+  static const _feedIndex = 0;
+
+  int _index = _feedIndex;
 
   // Bumping this makes the tabs refetch after a new post is created.
   int _refreshToken = 0;
 
+  @override
+  void initState() {
+    super.initState();
+    // The feed is the first tab, so the block starts on.
+    SecureScreen.enable();
+  }
+
+  @override
+  void dispose() {
+    SecureScreen.disable();
+    super.dispose();
+  }
+
+  /// FLAG_SECURE is set on the Activity, not per widget, so it has to be
+  /// toggled as tabs change. It cannot live in the feed's initState and
+  /// dispose: IndexedStack keeps every tab mounted, so those never fire
+  /// on a tab switch and the block would stay on across the whole app.
+  void _syncSecure(int tabIndex) {
+    if (tabIndex == _feedIndex) {
+      SecureScreen.enable();
+    } else {
+      SecureScreen.disable();
+    }
+  }
+
   Future<void> _openCreate() async {
+    // The camera screen is pushed over the feed, so lift the block while
+    // it is open, then restore it for whichever tab we land on.
+    SecureScreen.disable();
+
     final created = await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => const CreatePostScreen()),
     );
-    if (created == true && mounted) {
+
+    if (!mounted) return;
+
+    if (created == true) {
       setState(() {
         _refreshToken++;
         _index = 3; // land on the profile, where the new post lives
       });
     }
+    _syncSecure(_index);
   }
 
   @override
@@ -56,6 +92,7 @@ class _MainShellState extends State<MainShell> {
             _openCreate();
           } else {
             setState(() => _index = i);
+            _syncSecure(i);
           }
         },
         destinations: const [

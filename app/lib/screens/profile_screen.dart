@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../config.dart';
 import '../models/post.dart';
 import '../services/api_service.dart';
-import '../services/secure_screen.dart';
 import 'login_screen.dart';
 import 'post_detail_screen.dart';
 import 'server_screen.dart';
@@ -29,14 +28,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    SecureScreen.enable();
     _load();
-  }
-
-  @override
-  void dispose() {
-    SecureScreen.disable();
-    super.dispose();
   }
 
   Future<void> _load() async {
@@ -244,13 +236,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     )
                   else
                     SliverPadding(
-                      padding: const EdgeInsets.all(2),
+                      padding: const EdgeInsets.fromLTRB(12, 4, 12, 20),
                       sliver: SliverGrid(
                         gridDelegate:
                             const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 3,
-                          crossAxisSpacing: 2,
-                          mainAxisSpacing: 2,
+                          crossAxisSpacing: 6,
+                          mainAxisSpacing: 6,
                         ),
                         delegate: SliverChildBuilderDelegate(
                           (context, index) => _GridTile(
@@ -294,35 +286,54 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           Row(
             children: [
-              CircleAvatar(
-                radius: 40,
-                backgroundColor: scheme.primaryContainer,
-                backgroundImage: (avatar != null && avatar.isNotEmpty)
-                    ? NetworkImage(
-                        avatar.startsWith('http')
-                            ? avatar
-                            : '${Config.baseUrl}$avatar',
-                      )
-                    : null,
-                child: (avatar == null || avatar.isEmpty)
-                    ? Text(
-                        username.isNotEmpty ? username[0].toUpperCase() : '?',
-                        style: TextStyle(
-                          fontSize: 30,
-                          fontWeight: FontWeight.w600,
-                          color: scheme.onPrimaryContainer,
-                        ),
-                      )
-                    : null,
+              Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [scheme.primary, scheme.tertiary],
+                  ),
+                ),
+                child: Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: scheme.surface,
+                  ),
+                  child: CircleAvatar(
+                    radius: 38,
+                    backgroundColor: scheme.primaryContainer,
+                    backgroundImage: (avatar != null && avatar.isNotEmpty)
+                        ? NetworkImage(
+                            avatar.startsWith('http')
+                                ? avatar
+                                : '${Config.baseUrl}$avatar',
+                          )
+                        : null,
+                    child: (avatar == null || avatar.isEmpty)
+                        ? Text(
+                            username.isNotEmpty
+                                ? username[0].toUpperCase()
+                                : '?',
+                            style: TextStyle(
+                              fontSize: 30,
+                              fontWeight: FontWeight.w700,
+                              color: scheme.onPrimaryContainer,
+                            ),
+                          )
+                        : null,
+                  ),
+                ),
               ),
-              const SizedBox(width: 28),
+              const SizedBox(width: 20),
               Expanded(
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    _stat(context, '$postCount', 'posts'),
-                    _stat(context, '0', 'followers'),
-                    _stat(context, '0', 'following'),
+                    Expanded(child: _stat(context, '$postCount', 'posts')),
+                    Expanded(child: _stat(context, '0', 'followers')),
+                    Expanded(child: _stat(context, '0', 'following')),
                   ],
                 ),
               ),
@@ -338,18 +349,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _stat(BuildContext context, String value, String label) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          value,
-          style: Theme.of(context)
-              .textTheme
-              .titleMedium
-              ?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        Text(label, style: Theme.of(context).textTheme.bodySmall),
-      ],
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 3),
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -378,6 +402,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
+      ),
     );
   }
 }
@@ -402,7 +427,9 @@ class _GridTile extends StatelessWidget {
         ? post.imageUrl
         : '${Config.baseUrl}${post.imageUrl}';
 
-    return GestureDetector(
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: GestureDetector(
       onTap: deleting ? null : onTap,
       child: Stack(
         fit: StackFit.expand,
@@ -454,6 +481,7 @@ class _GridTile extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }

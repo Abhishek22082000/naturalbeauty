@@ -95,7 +95,13 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 child: Container(
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .outlineVariant
+                          .withValues(alpha: 0.6),
+                    ),
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: _image == null
@@ -103,9 +109,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.camera_alt_outlined, size: 48),
-                              SizedBox(height: 8),
-                              Text('Tap to take a photo'),
+                              Icon(Icons.camera_alt_outlined, size: 46),
+                              SizedBox(height: 10),
+                              Text(
+                                'Tap to take a photo',
+                                style: TextStyle(fontWeight: FontWeight.w500),
+                              ),
                             ],
                           ),
                         )
@@ -168,16 +177,31 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               if (_error != null) ...[
                 const SizedBox(height: 16),
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.errorContainer,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Text(
-                    _error!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onErrorContainer,
-                    ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.error_outline,
+                          size: 19,
+                          color:
+                              Theme.of(context).colorScheme.onErrorContainer),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _error!,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onErrorContainer,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
