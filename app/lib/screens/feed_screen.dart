@@ -3,7 +3,6 @@ import '../models/post.dart';
 import '../services/api_service.dart';
 import '../services/secure_screen.dart';
 import '../widgets/post_card.dart';
-import 'create_post_screen.dart';
 
 /// The dashboard: an Instagram-style feed of every post, newest first.
 ///
@@ -98,20 +97,14 @@ class _FeedScreenState extends State<FeedScreen> {
       appBar: AppBar(
         title: const Text(
           'NaturalBeauty',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add_box_outlined),
-            tooltip: 'New post',
-            onPressed: () async {
-              await Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const CreatePostScreen()),
-              );
-              _load();
-            },
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 22,
+            letterSpacing: -0.5,
           ),
-        ],
+        ),
+        centerTitle: false,
+        scrolledUnderElevation: 0.5,
       ),
 
       body: _loading

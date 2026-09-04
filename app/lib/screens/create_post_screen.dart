@@ -64,15 +64,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     if (!mounted) return;
 
     if (result.ok) {
-      final postId = result.data['post']?['id'];
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            postId != null ? 'Posted — post ID $postId' : 'Post created',
-          ),
-        ),
+        const SnackBar(content: Text('Shared')),
       );
-      Navigator.of(context).pop();
+      Navigator.of(context).pop(true);
     } else {
       setState(() {
         _loading = false;

@@ -3,7 +3,6 @@ import '../config.dart';
 import '../models/post.dart';
 import '../services/api_service.dart';
 import '../services/secure_screen.dart';
-import 'create_post_screen.dart';
 import 'login_screen.dart';
 import 'post_detail_screen.dart';
 import 'server_screen.dart';
@@ -71,6 +70,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
   }
 
+  /// The name shown in the app bar: full name if set, else the username.
+  String get _displayName {
+    final full = _user?['full_name']?.toString();
+    if (full != null && full.trim().isNotEmpty) return full;
+    return _user?['username']?.toString() ?? 'Profile';
+  }
+
   Future<void> _logout() async {
     await ApiService.clearToken();
     if (!mounted) return;
@@ -84,35 +90,75 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          _user?['username']?.toString() ?? 'Profile',
-          style: const TextStyle(fontWeight: FontWeight.w600),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    _displayName,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 19,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if ((_user?['is_verified'] ?? 0) == 1) ...[
+                  const SizedBox(width: 5),
+                  const Icon(Icons.verified,
+                      size: 16, color: Color(0xFF3897F0)),
+                ],
+              ],
+            ),
+            if (_user?['username'] != null)
+              Text(
+                '@${_user!['username']}',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+          ],
         ),
+        centerTitle: false,
+        scrolledUnderElevation: 0.5,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add_box_outlined),
-            tooltip: 'New post',
-            onPressed: () async {
-              await Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const CreatePostScreen()),
-              );
-              _load();
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.menu),
+            tooltip: 'Menu',
+            onSelected: (value) async {
+              if (value == 'server') {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ServerScreen()),
+                );
+                _load();
+              } else if (value == 'logout') {
+                _logout();
+              }
             },
-          ),
-          IconButton(
-            icon: const Icon(Icons.dns_outlined),
-            tooltip: 'Server settings',
-            onPressed: () async {
-              await Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const ServerScreen()),
-              );
-              _load();
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Log out',
-            onPressed: _logout,
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: 'server',
+                child: ListTile(
+                  leading: Icon(Icons.dns_outlined),
+                  title: Text('Server settings'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                value: 'logout',
+                child: ListTile(
+                  leading: Icon(Icons.logout),
+                  title: Text('Log out'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -140,7 +186,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: _message(
                         icon: Icons.photo_camera_outlined,
                         title: 'No posts yet',
-                        detail: 'Tap + to share your first photo',
+                        detail: 'Tap Create below to share your first photo',
                       ),
                     )
                   else
@@ -181,11 +227,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final scheme = theme.colorScheme;
 
     final username = _user?['username']?.toString() ?? '';
-    final fullName = _user?['full_name']?.toString();
     final bio = _user?['bio']?.toString();
     final avatar = _user?['profile_picture']?.toString();
     final postCount = _user?['post_count'] ?? _posts.length;
-    final isVerified = (_user?['is_verified'] ?? 0) == 1;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
@@ -228,23 +272,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              if (fullName != null && fullName.isNotEmpty)
-                Text(
-                  fullName,
-                  style: theme.textTheme.bodyMedium
-                      ?.copyWith(fontWeight: FontWeight.w600),
-                ),
-              if (isVerified) ...[
-                const SizedBox(width: 4),
-                const Icon(Icons.verified, size: 15, color: Color(0xFF3897F0)),
-              ],
-            ],
-          ),
           if (bio != null && bio.isNotEmpty) ...[
-            const SizedBox(height: 4),
+            const SizedBox(height: 16),
             Text(bio, style: theme.textTheme.bodyMedium),
           ],
         ],
