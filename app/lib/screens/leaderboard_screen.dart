@@ -3,7 +3,7 @@ import '../config.dart';
 import '../models/leaderboard_entry.dart';
 import '../services/api_service.dart';
 
-/// Top NaturalBeauty — users ranked by average likes per post.
+/// Top Natural Beauty — users ranked by average likes per post.
 class LeaderboardScreen extends StatefulWidget {
   const LeaderboardScreen({super.key});
 
@@ -11,15 +11,30 @@ class LeaderboardScreen extends StatefulWidget {
   State<LeaderboardScreen> createState() => _LeaderboardScreenState();
 }
 
-class _LeaderboardScreenState extends State<LeaderboardScreen> {
+class _LeaderboardScreenState extends State<LeaderboardScreen>
+    with SingleTickerProviderStateMixin {
   List<LeaderboardEntry> _entries = [];
   bool _loading = true;
   String? _error;
+
+  /// Drives the entrance: podium bars grow, rows slide in one after
+  /// another. Restarted on every successful load so pull-to-refresh
+  /// replays it.
+  late final AnimationController _entrance = AnimationController(
+    duration: const Duration(milliseconds: 900),
+    vsync: this,
+  );
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _entrance.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -41,6 +56,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         _error = result.message;
       }
     });
+
+    if (result.ok && result.entries.isNotEmpty) {
+      _entrance.forward(from: 0);
+    }
   }
 
   @override
@@ -48,7 +67,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'Top NaturalBeauty',
+          'Top Natural Beauty',
           style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20),
         ),
         centerTitle: false,
@@ -77,8 +96,18 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                           padding: const EdgeInsets.only(bottom: 24),
                           children: [
                             const _Explainer(),
-                            if (_entries.length >= 3) _Podium(entries: _entries),
-                            ..._entries.map((e) => _Row(entry: e)),
+                            if (_entries.length >= 3)
+                              _Podium(
+                                entries: _entries,
+                                animation: _entrance,
+                              ),
+                            ..._entries.asMap().entries.map(
+                                  (e) => _Row(
+                                    entry: e.value,
+                                    animation: _entrance,
+                                    position: e.key,
+                                  ),
+                                ),
                           ],
                         ),
             ),
@@ -122,8 +151,9 @@ class _Explainer extends StatelessWidget {
 /// The top three, with first place raised in the middle.
 class _Podium extends StatelessWidget {
   final List<LeaderboardEntry> entries;
+  final Animation<double> animation;
 
-  const _Podium({required this.entries});
+  const _Podium({required this.entries, required this.animation});
 
   @override
   Widget build(BuildContext context) {
@@ -132,9 +162,29 @@ class _Podium extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Expanded(child: _PodiumSpot(entry: entries[1], height: 74)),
-          Expanded(child: _PodiumSpot(entry: entries[0], height: 96)),
-          Expanded(child: _PodiumSpot(entry: entries[2], height: 58)),
+          // Silver and bronze rise first, then gold — so the eye lands
+          // on first place last.
+          Expanded(
+            child: _PodiumSpot(
+                entry: entries[1],
+                height: 74,
+                animation: animation,
+                delay: 0.05),
+          ),
+          Expanded(
+            child: _PodiumSpot(
+                entry: entries[0],
+                height: 96,
+                animation: animation,
+                delay: 0.22),
+          ),
+          Expanded(
+            child: _PodiumSpot(
+                entry: entries[2],
+                height: 58,
+                animation: animation,
+                delay: 0.13),
+          ),
         ],
       ),
     );
@@ -144,8 +194,15 @@ class _Podium extends StatelessWidget {
 class _PodiumSpot extends StatelessWidget {
   final LeaderboardEntry entry;
   final double height;
+  final Animation<double> animation;
+  final double delay;
 
-  const _PodiumSpot({required this.entry, required this.height});
+  const _PodiumSpot({
+    required this.entry,
+    required this.height,
+    required this.animation,
+    required this.delay,
+  });
 
   static const _medals = {
     1: Color(0xFFD4AF37), // gold
@@ -158,7 +215,25 @@ class _PodiumSpot extends StatelessWidget {
     final colour = _medals[entry.rank] ?? Theme.of(context).colorScheme.primary;
     final isFirst = entry.rank == 1;
 
-    return Column(
+    // Each spot animates over its own slice of the shared controller.
+    final grow = CurvedAnimation(
+      parent: animation,
+      curve: Interval(delay, (delay + 0.55).clamp(0.0, 1.0),
+          curve: Curves.easeOutBack),
+    );
+    final fade = CurvedAnimation(
+      parent: animation,
+      curve: Interval((delay + 0.15).clamp(0.0, 1.0), 1.0,
+          curve: Curves.easeOut),
+    );
+
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) => Opacity(
+        opacity: fade.value,
+        child: child,
+      ),
+      child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (isFirst)
@@ -186,25 +261,32 @@ class _PodiumSpot extends StatelessWidget {
               ),
         ),
         const SizedBox(height: 6),
-        Container(
-          height: height,
-          decoration: BoxDecoration(
-            color: colour.withValues(alpha: 0.18),
-            border: Border(top: BorderSide(color: colour, width: 3)),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
-          ),
-          child: Center(
-            child: Text(
-              '${entry.rank}',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w800,
-                color: colour,
-              ),
+        AnimatedBuilder(
+          animation: grow,
+          builder: (context, _) => Container(
+            height: height * grow.value.clamp(0.0, 1.0),
+            decoration: BoxDecoration(
+              color: colour.withValues(alpha: 0.18),
+              border: Border(top: BorderSide(color: colour, width: 3)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(8)),
             ),
+            alignment: Alignment.center,
+            clipBehavior: Clip.hardEdge,
+            child: grow.value > 0.55
+                ? Text(
+                    '${entry.rank}',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      color: colour,
+                    ),
+                  )
+                : null,
           ),
         ),
       ],
+      ),
     );
   }
 }
@@ -212,8 +294,14 @@ class _PodiumSpot extends StatelessWidget {
 /// One full-width row in the ranked list.
 class _Row extends StatelessWidget {
   final LeaderboardEntry entry;
+  final Animation<double> animation;
+  final int position;
 
-  const _Row({required this.entry});
+  const _Row({
+    required this.entry,
+    required this.animation,
+    required this.position,
+  });
 
   static const _medals = {
     1: Color(0xFFD4AF37),
@@ -227,7 +315,23 @@ class _Row extends StatelessWidget {
     final scheme = theme.colorScheme;
     final medal = _medals[entry.rank];
 
-    return Container(
+    // Rows enter after the podium, one shortly after the next.
+    final start = (0.45 + position * 0.09).clamp(0.0, 0.9);
+    final slide = CurvedAnimation(
+      parent: animation,
+      curve: Interval(start, 1.0, curve: Curves.easeOutCubic),
+    );
+
+    return AnimatedBuilder(
+      animation: slide,
+      builder: (context, child) => Opacity(
+        opacity: slide.value,
+        child: Transform.translate(
+          offset: Offset((1 - slide.value) * 28, 0),
+          child: child,
+        ),
+      ),
+      child: Container(
       margin: const EdgeInsets.fromLTRB(16, 6, 16, 0),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       decoration: BoxDecoration(
@@ -291,11 +395,15 @@ class _Row extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                entry.avgLabel,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: medal ?? scheme.primary,
+              // Counts up as the row settles, rather than just appearing.
+              AnimatedBuilder(
+                animation: slide,
+                builder: (context, _) => Text(
+                  (entry.avgLikes * slide.value).toStringAsFixed(2),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: medal ?? scheme.primary,
+                  ),
                 ),
               ),
               Text(
@@ -306,6 +414,7 @@ class _Row extends StatelessWidget {
             ],
           ),
         ],
+      ),
       ),
     );
   }

@@ -87,7 +87,7 @@ class _FeedScreenState extends State<FeedScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'NaturalBeauty',
+          'Natural Beauty',
           style: TextStyle(
             fontWeight: FontWeight.w700,
             fontSize: 22,

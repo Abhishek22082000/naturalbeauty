@@ -16,7 +16,7 @@ class NaturalBeautyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'NaturalBeauty',
+      title: 'Natural Beauty',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),

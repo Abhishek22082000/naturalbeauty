@@ -1,5 +1,5 @@
 name: naturalbeauty
-description: Flutter client for the NaturalBeauty API
+description: Flutter client for the Natural Beauty API
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -12,6 +12,7 @@ dependencies:
   http: ^1.2.0
   shared_preferences: ^2.2.2
   image_picker: ^1.0.7
+  image_cropper: ^8.0.2
   cupertino_icons: ^1.0.6
 
 dev_dependencies:

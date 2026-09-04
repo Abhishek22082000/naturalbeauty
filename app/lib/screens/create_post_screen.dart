@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/api_service.dart';
 
@@ -35,13 +36,55 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         imageQuality: 85,
       );
       if (picked == null) return;
+
+      final cropped = await _crop(picked.path);
+      if (cropped == null || !mounted) return; // cancelled at the crop step
+
       setState(() {
-        _image = File(picked.path);
+        _image = File(cropped);
         _error = null;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _error = 'Could not open ${source.name}: $e');
     }
+  }
+
+  /// Cropping only — no filters, rotation or colour tools.
+  ///
+  /// The aspect ratio is locked to 1:1 because the feed renders every post
+  /// in a square, so cropping here is what the poster will actually see.
+  Future<String?> _crop(String path) async {
+    final scheme = Theme.of(context).colorScheme;
+
+    final result = await ImageCropper().cropImage(
+      sourcePath: path,
+      aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+      compressQuality: 88,
+      uiSettings: [
+        AndroidUiSettings(
+          toolbarTitle: 'Crop photo',
+          toolbarColor: scheme.surface,
+          toolbarWidgetColor: scheme.onSurface,
+          statusBarColor: scheme.surface,
+          activeControlsWidgetColor: scheme.primary,
+          backgroundColor: Colors.black,
+          initAspectRatio: CropAspectRatioPreset.square,
+          lockAspectRatio: true,
+          // Hide everything except the crop frame itself.
+          hideBottomControls: true,
+        ),
+        IOSUiSettings(
+          title: 'Crop photo',
+          aspectRatioLockEnabled: true,
+          resetAspectRatioEnabled: false,
+          rotateButtonsHidden: true,
+          rotateClockwiseButtonHidden: true,
+        ),
+      ],
+    );
+
+    return result?.path;
   }
 
   Future<void> _submit() async {

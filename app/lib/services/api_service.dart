@@ -52,7 +52,7 @@ class FeedResult {
   });
 }
 
-/// Talks to the NaturalBeauty backend.
+/// Talks to the Natural Beauty backend.
 ///
 /// Mirrors exactly the endpoints that exist on the server:
 ///   POST   /auth/signup
