@@ -61,14 +61,15 @@ const getFeed = async (req, res) => {
         const limit = Math.min(parseInt(req.query.limit, 10) || 20, 50);
         const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
 
+        // Other people's posts only — your own live on your profile.
         const [rows] = await connection.query(
             `SELECT ${POST_COLUMNS}
              FROM posts p
              JOIN users u ON p.user_id = u.id
-             WHERE u.is_active = 1
+             WHERE u.is_active = 1 AND p.user_id != ?
              ORDER BY p.created_at DESC
              LIMIT ${limit} OFFSET ${offset}`,
-            [userId]
+            [userId, userId]
         );
 
         return res.status(200).json({ posts: rows });

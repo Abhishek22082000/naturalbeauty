@@ -1,8 +1,6 @@
-const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const connection = require('../config/connection');
-const app = express()
 
 
 const login = async (req, res) => {
@@ -80,4 +78,34 @@ const signup = async (req, res) => {
 };
 
 
-module.exports = {login, signup}
+/**
+ * GET /auth/me — the logged-in user's profile.
+ *
+ * The id comes from the verified token, never from the request, so a
+ * client cannot ask for someone else's profile here.
+ */
+const me = async (req, res) => {
+    try {
+        const [rows] = await connection.query(
+            `SELECT id, username, full_name, email, bio, website,
+                    profile_picture, is_verified, is_private, created_at,
+                    (SELECT COUNT(*) FROM posts WHERE user_id = users.id) AS post_count
+             FROM users
+             WHERE id = ? AND is_active = 1`,
+            [req.user.id]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        return res.status(200).json({ user: rows[0] });
+
+    } catch (error) {
+        console.error('Error loading profile:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
+
+module.exports = {login, signup, me}
