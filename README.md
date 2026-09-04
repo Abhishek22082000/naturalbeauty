@@ -20,22 +20,32 @@ Or trigger a build by hand: Actions → Build Android APK → **Run workflow**.
 
 ## Pointing it at your API
 
-The URL is set in one place — [`app/lib/config.dart`](app/lib/config.dart):
+**The URL is set inside the app, not in the code.** On first launch the
+app asks for it, and it can be changed any time from the server icon in
+the app bar or the link under the login button.
 
-```dart
-static const String baseUrl = 'http://192.168.1.5:3000';
-```
+Enter whatever address your Node server is on, e.g. `192.168.1.16:3000`.
+The `http://` and `:3000` are filled in for you if you leave them out.
+**Test** checks the server answers before you save, so you find problems
+on that screen rather than at the login prompt.
 
-For a phone to reach a backend running on your PC:
+Because the URL lives on the device, a changed IP means editing one field
+on the phone — no APK rebuild.
+
+For a phone to reach a backend on your PC:
 
 - `npm run dev` must be running
-- The PC's IP must still be `192.168.1.5` — check with `ipconfig`, it changes
+- The IP must be current — run `ipconfig` on the PC, it changes when the
+  router reassigns DHCP leases
 - Phone and PC on the same Wi-Fi
-- Windows Firewall must allow inbound TCP 3000:
+- Windows Firewall must allow inbound TCP 3000. In an **admin** PowerShell:
 
 ```powershell
 New-NetFirewallRule -DisplayName "Node API 3000" -Direction Inbound -LocalPort 3000 -Protocol TCP -Action Allow
 ```
+
+The backend must also bind to all interfaces, not just localhost —
+`app.listen(3000, '0.0.0.0', ...)`. This is already set.
 
 ## Screens
 
@@ -67,13 +77,14 @@ A feed becomes possible once the backend has:
 app/
 ├── lib/
 │   ├── main.dart              entry point, decides login vs home
-│   ├── config.dart            API base URL — edit this
+│   ├── config.dart            API base URL, saved on the device
 │   ├── services/
 │   │   └── api_service.dart   every HTTP call to the backend
 │   └── screens/
 │       ├── login_screen.dart
 │       ├── signup_screen.dart
 │       ├── home_screen.dart
+│       ├── server_screen.dart    backend URL + connection test
 │       ├── create_post_screen.dart
 │       └── like_screen.dart
 └── android/                   internet + camera permissions, cleartext HTTP

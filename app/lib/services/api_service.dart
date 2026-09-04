@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
@@ -79,6 +80,48 @@ class ApiService {
       statusCode: 0,
       message: 'Cannot reach server at ${Config.baseUrl}\n\n$e',
     );
+  }
+
+  // ------------------------------------------------------------ health
+
+  /// Checks that a backend is reachable at [url].
+  ///
+  /// There is no dedicated health endpoint, so this POSTs an empty body to
+  /// /auth/login. Any HTTP response at all — including the 400 or 401 that
+  /// an empty login produces — proves the server is up and answering.
+  /// Only a socket-level failure means unreachable.
+  static Future<ApiResult> ping(String url) async {
+    try {
+      final res = await http
+          .post(
+            Uri.parse('$url/auth/login'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({}),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      return ApiResult(
+        ok: true,
+        statusCode: res.statusCode,
+        message: 'Connected — server answered with ${res.statusCode}',
+      );
+    } on SocketException catch (e) {
+      return ApiResult(
+        ok: false,
+        statusCode: 0,
+        message: 'No route to $url\n\n${e.message}\n\n'
+            'Check the IP, the Wi-Fi network, and the firewall.',
+      );
+    } on TimeoutException {
+      return ApiResult(
+        ok: false,
+        statusCode: 0,
+        message: 'Timed out reaching $url\n\n'
+            'Usually the Windows Firewall blocking port 3000.',
+      );
+    } catch (e) {
+      return ApiResult(ok: false, statusCode: 0, message: 'Failed: $e');
+    }
   }
 
   // -------------------------------------------------------------- auth

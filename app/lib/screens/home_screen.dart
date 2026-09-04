@@ -4,9 +4,16 @@ import '../config.dart';
 import 'login_screen.dart';
 import 'create_post_screen.dart';
 import 'like_screen.dart';
+import 'server_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _logout(BuildContext context) async {
     await ApiService.clearToken();
@@ -23,6 +30,16 @@ class HomeScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('NaturalBeauty'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.dns_outlined),
+            tooltip: 'Server settings',
+            onPressed: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ServerScreen()),
+              );
+              if (mounted) setState(() {});
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Log out',

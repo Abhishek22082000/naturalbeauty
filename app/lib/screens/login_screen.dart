@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import '../config.dart';
 import '../services/api_service.dart';
 import 'signup_screen.dart';
 import 'home_screen.dart';
+import 'server_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -155,6 +157,25 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               ),
                       child: const Text("Don't have an account? Sign up"),
+                    ),
+
+                    const SizedBox(height: 8),
+                    TextButton.icon(
+                      onPressed: _loading
+                          ? null
+                          : () async {
+                              await Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const ServerScreen(),
+                                ),
+                              );
+                              if (mounted) setState(() {});
+                            },
+                      icon: const Icon(Icons.dns_outlined, size: 18),
+                      label: Text(
+                        'Server: ${Config.baseUrl}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
                     ),
                   ],
                 ),
