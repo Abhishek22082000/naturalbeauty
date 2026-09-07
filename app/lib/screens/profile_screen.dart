@@ -197,8 +197,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         sourcePath: picked.path,
         aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
         compressQuality: 90,
-        // The avatar always renders in a circle, so frame it as one.
-        cropStyle: CropStyle.circle,
         uiSettings: [
           AndroidUiSettings(
             toolbarTitle: 'Crop photo',
@@ -210,6 +208,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             initAspectRatio: CropAspectRatioPreset.square,
             lockAspectRatio: true,
             hideBottomControls: true,
+            // The avatar always renders in a circle, so frame it as one.
+            cropStyle: CropStyle.circle,
           ),
           IOSUiSettings(
             title: 'Crop photo',
@@ -217,6 +217,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             resetAspectRatioEnabled: false,
             rotateButtonsHidden: true,
             rotateClockwiseButtonHidden: true,
+            cropStyle: CropStyle.circle,
           ),
         ],
       );
