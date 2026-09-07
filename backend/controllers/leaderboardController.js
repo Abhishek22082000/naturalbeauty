@@ -129,6 +129,13 @@ const getLeaderboard = async (req, res) => {
         // The period filter sits in the WHERE, so it narrows which posts
         // count before the aggregate runs — a user with no posts in the
         // window drops off the board entirely rather than showing a zero.
+        //
+        // Private accounts are off the board completely, and a public
+        // account's private posts do not count toward its average — the
+        // board only ranks what everyone can actually see. No caller id is
+        // needed: it is the same public view for everyone, including your
+        // own private posts, which would otherwise let you infer a rival's
+        // standing from a board only you can see.
         const [rows] = await connection.query(
             `SELECT u.id, u.username, u.full_name, u.profile_picture,
                     u.is_verified,
@@ -138,7 +145,10 @@ const getLeaderboard = async (req, res) => {
              FROM users u
              JOIN posts p ON p.user_id = u.id
              LEFT JOIN likes l ON l.post_id = p.id
-             WHERE u.is_active = 1 ${period.sql}
+             WHERE u.is_active = 1
+                   AND u.is_private = 0
+                   AND p.is_private = 0
+                   ${period.sql}
              GROUP BY u.id, u.username, u.full_name, u.profile_picture,
                       u.is_verified
              HAVING post_count >= ?

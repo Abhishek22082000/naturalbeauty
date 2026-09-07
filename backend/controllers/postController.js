@@ -1,9 +1,15 @@
 const connection = require('../config/connection');
+const { VISIBLE_TO_CALLER } = require('../utils/privacy');
 
 const createPost = async (req, res) => {
     try {
         const { caption, location } = req.body;
         const userId = req.user.id;
+
+        // Form fields arrive as strings, so accept the usual truthy forms
+        // rather than relying on JS truthiness (the string "0" is truthy).
+        const isPrivate = ['1', 'true', 'yes', 'on']
+            .includes(String(req.body.is_private ?? '').toLowerCase()) ? 1 : 0;
        
         // image comes from multer, not the body
         if (!req.file) {
@@ -13,8 +19,9 @@ const createPost = async (req, res) => {
         const imageUrl = `/uploads/posts/${req.file.filename}`;
 
         const [result] = await connection.query(
-            'INSERT INTO posts (user_id, image_url, caption, location) VALUES (?, ?, ?, ?)',
-            [userId, imageUrl, caption || null, location || null]
+            `INSERT INTO posts (user_id, image_url, caption, location, is_private)
+             VALUES (?, ?, ?, ?, ?)`,
+            [userId, imageUrl, caption || null, location || null, isPrivate]
         );
 
         return res.status(201).json({
@@ -23,7 +30,8 @@ const createPost = async (req, res) => {
                 id: result.insertId,
                 image_url: imageUrl,
                 caption: caption || null,
-                location: location || null
+                location: location || null,
+                is_private: isPrivate
             }
         });
 
@@ -39,6 +47,7 @@ const createPost = async (req, res) => {
 // ship the password hash to the client.
 const POST_COLUMNS = `
     p.id, p.user_id, p.image_url, p.caption, p.location, p.created_at,
+    p.is_private,
     u.username, u.full_name, u.profile_picture, u.is_verified,
     (SELECT COUNT(*) FROM likes WHERE post_id = p.id) AS like_count,
     EXISTS(SELECT 1 FROM likes WHERE post_id = p.id AND user_id = ?) AS is_liked
@@ -67,9 +76,10 @@ const getFeed = async (req, res) => {
              FROM posts p
              JOIN users u ON p.user_id = u.id
              WHERE u.is_active = 1 AND p.user_id != ?
+                   AND ${VISIBLE_TO_CALLER}
              ORDER BY p.created_at DESC
              LIMIT ${limit} OFFSET ${offset}`,
-            [userId, userId]
+            [userId, userId, userId]
         );
 
         return res.status(200).json({ posts: rows });
@@ -87,8 +97,8 @@ const getPost = async (req, res) => {
             `SELECT ${POST_COLUMNS}
              FROM posts p
              JOIN users u ON p.user_id = u.id
-             WHERE p.id = ?`,
-            [req.user.id, req.params.id]
+             WHERE p.id = ? AND ${VISIBLE_TO_CALLER}`,
+            [req.user.id, req.params.id, req.user.id]
         );
 
         if (rows.length === 0) {
@@ -113,16 +123,54 @@ const getUserPost = async (req, res) => {
             `SELECT ${POST_COLUMNS}
              FROM posts p
              JOIN users u ON p.user_id = u.id
-             WHERE p.user_id = ?
+             WHERE p.user_id = ? AND ${VISIBLE_TO_CALLER}
              ORDER BY p.created_at DESC
              LIMIT ${limit} OFFSET ${offset}`,
-            [req.user.id, req.params.userId]
+            [req.user.id, req.params.userId, req.user.id]
         );
 
         return res.status(200).json({ posts: rows });
 
     } catch (error) {
         console.error('Error loading user posts:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
+/**
+ * PATCH /posts/:id/privacy — flips one of the caller's own posts between
+ * public and private.
+ *
+ * The ownership check lives in the query, so someone else's post reports
+ * 404 rather than being changed.
+ */
+const setPostPrivacy = async (req, res) => {
+    try {
+        const { is_private: raw } = req.body;
+
+        if (raw === undefined || raw === null) {
+            return res.status(400).json({ message: 'is_private is required' });
+        }
+
+        const isPrivate = ['1', 'true', 'yes', 'on']
+            .includes(String(raw).toLowerCase()) ? 1 : 0;
+
+        const [result] = await connection.query(
+            'UPDATE posts SET is_private = ? WHERE id = ? AND user_id = ?',
+            [isPrivate, req.params.id, req.user.id]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Post not found' });
+        }
+
+        return res.status(200).json({
+            message: isPrivate ? 'Post is now private' : 'Post is now public',
+            is_private: isPrivate
+        });
+
+    } catch (error) {
+        console.error('Error updating post privacy:', error);
         return res.status(500).json({ message: 'Internal server error' });
     }
 };
@@ -160,5 +208,6 @@ module.exports = {
     getFeed,
     getPost,
     getUserPost,
+    setPostPrivacy,
     deletePost
 }

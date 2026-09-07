@@ -7,6 +7,7 @@ const {
     getFeed,
     getPost,
     getUserPost,
+    setPostPrivacy,
     deletePost
 } = require('../controllers/postController');
 const verifyToken = require('../middlewares/auth');
@@ -19,6 +20,7 @@ router.post('/create', verifyToken, upload.single('image'), createPost);
 router.get('/feed', verifyToken, getFeed);
 router.get('/user/:userId', verifyToken, getUserPost);
 router.get('/:id', verifyToken, getPost);
+router.patch('/:id/privacy', verifyToken, setPostPrivacy);
 router.delete('/:id', verifyToken, deletePost);
 
 module.exports = router;

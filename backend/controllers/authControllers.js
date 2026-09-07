@@ -108,4 +108,40 @@ const me = async (req, res) => {
 };
 
 
-module.exports = {login, signup, me}
+/**
+ * PATCH /auth/privacy - makes the caller's whole account private or public.
+ *
+ * The account flag is the stricter of the two: while it is on, even a
+ * post marked public stays hidden from everyone else.
+ */
+const setAccountPrivacy = async (req, res) => {
+    try {
+        const { is_private: raw } = req.body;
+
+        if (raw === undefined || raw === null) {
+            return res.status(400).json({ message: 'is_private is required' });
+        }
+
+        const isPrivate = ['1', 'true', 'yes', 'on']
+            .includes(String(raw).toLowerCase()) ? 1 : 0;
+
+        await connection.query(
+            'UPDATE users SET is_private = ? WHERE id = ?',
+            [isPrivate, req.user.id]
+        );
+
+        return res.status(200).json({
+            message: isPrivate
+                ? 'Account is now private'
+                : 'Account is now public',
+            is_private: isPrivate
+        });
+
+    } catch (error) {
+        console.error('Error updating account privacy:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
+
+module.exports = {login, signup, me, setAccountPrivacy}
