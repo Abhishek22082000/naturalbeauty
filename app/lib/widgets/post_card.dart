@@ -265,6 +265,9 @@ class _Avatar extends StatelessWidget {
     final inner = CircleAvatar(
       radius: 18,
       backgroundColor: scheme.primaryContainer,
+      // Keyed on the URL so a changed avatar is refetched rather than
+      // served from the cache for the previous one.
+      key: ValueKey(url ?? 'none'),
       backgroundImage: url != null ? NetworkImage(url!) : null,
       onBackgroundImageError: url != null ? (_, __) {} : null,
       child: url == null

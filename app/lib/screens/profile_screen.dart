@@ -1,4 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_cropper/image_cropper.dart';
+import 'package:image_picker/image_picker.dart';
 import '../config.dart';
 import '../models/post.dart';
 import '../services/api_service.dart';
@@ -26,6 +30,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final Set<int> _deletingIds = {};
 
   bool get _accountPrivate => (_user?['is_private'] ?? 0) == 1;
+
+  final _picker = ImagePicker();
+  bool _savingAvatar = false;
 
   @override
   void initState() {
@@ -115,6 +122,150 @@ class _ProfileScreenState extends State<ProfileScreen> {
         SnackBar(content: Text(result.message)),
       );
     }
+  }
+
+  /// Take, pick or remove the profile photo.
+  Future<void> _changeAvatar() async {
+    final hasOne = (_user?['profile_picture']?.toString() ?? '').isNotEmpty;
+
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 10),
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 12),
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Take a photo'),
+              onTap: () => Navigator.pop(context, 'camera'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose from gallery'),
+              onTap: () => Navigator.pop(context, 'gallery'),
+            ),
+            if (hasOne)
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                title: const Text('Remove photo',
+                    style: TextStyle(color: Colors.red)),
+                onTap: () => Navigator.pop(context, 'remove'),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+
+    if (choice == null || !mounted) return;
+
+    if (choice == 'remove') {
+      await _removeAvatar();
+    } else {
+      await _pickAvatar(
+        choice == 'camera' ? ImageSource.camera : ImageSource.gallery,
+      );
+    }
+  }
+
+  Future<void> _pickAvatar(ImageSource source) async {
+    try {
+      final picked = await _picker.pickImage(
+        source: source,
+        maxWidth: 1080,
+        imageQuality: 88,
+      );
+      if (picked == null || !mounted) return;
+
+      // Square and circle-framed: the avatar is always shown in a circle,
+      // so cropping to anything else would just be cropped again on render.
+      final scheme = Theme.of(context).colorScheme;
+      final cropped = await ImageCropper().cropImage(
+        sourcePath: picked.path,
+        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+        compressQuality: 90,
+        // The avatar always renders in a circle, so frame it as one.
+        cropStyle: CropStyle.circle,
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Crop photo',
+            toolbarColor: scheme.surface,
+            toolbarWidgetColor: scheme.onSurface,
+            statusBarColor: scheme.surface,
+            activeControlsWidgetColor: scheme.primary,
+            backgroundColor: Colors.black,
+            initAspectRatio: CropAspectRatioPreset.square,
+            lockAspectRatio: true,
+            hideBottomControls: true,
+          ),
+          IOSUiSettings(
+            title: 'Crop photo',
+            aspectRatioLockEnabled: true,
+            resetAspectRatioEnabled: false,
+            rotateButtonsHidden: true,
+            rotateClockwiseButtonHidden: true,
+          ),
+        ],
+      );
+
+      if (cropped == null || !mounted) return;
+
+      setState(() => _savingAvatar = true);
+      final result = await ApiService.setProfilePicture(File(cropped.path));
+
+      if (!mounted) return;
+      setState(() {
+        _savingAvatar = false;
+        if (result.ok) {
+          _user = {
+            ..._user!,
+            'profile_picture': result.data['profile_picture'],
+          };
+        }
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content:
+              Text(result.ok ? 'Profile photo updated' : result.message),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _savingAvatar = false);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Could not open $e')));
+    }
+  }
+
+  Future<void> _removeAvatar() async {
+    setState(() => _savingAvatar = true);
+    final result = await ApiService.removeProfilePicture();
+
+    if (!mounted) return;
+    setState(() {
+      _savingAvatar = false;
+      if (result.ok) {
+        _user = {..._user!, 'profile_picture': null};
+      }
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(result.ok ? 'Photo removed' : result.message)),
+    );
   }
 
   /// Flips the whole account between private and public.
@@ -359,45 +510,94 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [scheme.primary, scheme.tertiary],
-                  ),
-                ),
-                child: Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: scheme.surface,
-                  ),
-                  child: CircleAvatar(
-                    radius: 38,
-                    backgroundColor: scheme.primaryContainer,
-                    backgroundImage: (avatar != null && avatar.isNotEmpty)
-                        ? NetworkImage(
-                            avatar.startsWith('http')
-                                ? avatar
-                                : '${Config.baseUrl}$avatar',
-                          )
-                        : null,
-                    child: (avatar == null || avatar.isEmpty)
-                        ? Text(
-                            username.isNotEmpty
-                                ? username[0].toUpperCase()
-                                : '?',
-                            style: TextStyle(
-                              fontSize: 30,
-                              fontWeight: FontWeight.w700,
-                              color: scheme.onPrimaryContainer,
+              GestureDetector(
+                onTap: _savingAvatar ? null : _changeAvatar,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [scheme.primary, scheme.tertiary],
+                        ),
+                      ),
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: scheme.surface,
+                        ),
+                        child: CircleAvatar(
+                          radius: 38,
+                          backgroundColor: scheme.primaryContainer,
+                          // The key forces a reload after upload; without
+                          // it Flutter serves the cached image for the old
+                          // URL and the change appears not to have worked.
+                          key: ValueKey(avatar ?? 'none'),
+                          backgroundImage:
+                              (avatar != null && avatar.isNotEmpty)
+                                  ? NetworkImage(
+                                      avatar.startsWith('http')
+                                          ? avatar
+                                          : '${Config.baseUrl}$avatar',
+                                    )
+                                  : null,
+                          child: (avatar == null || avatar.isEmpty)
+                              ? Text(
+                                  username.isNotEmpty
+                                      ? username[0].toUpperCase()
+                                      : '?',
+                                  style: TextStyle(
+                                    fontSize: 30,
+                                    fontWeight: FontWeight.w700,
+                                    color: scheme.onPrimaryContainer,
+                                  ),
+                                )
+                              : null,
+                        ),
+                      ),
+                    ),
+
+                    if (_savingAvatar)
+                      Positioned.fill(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.black.withValues(alpha: 0.45),
+                          ),
+                          child: const Center(
+                            child: SizedBox(
+                              height: 22,
+                              width: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
                             ),
-                          )
-                        : null,
-                  ),
+                          ),
+                        ),
+                      ),
+
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: scheme.primary,
+                          border:
+                              Border.all(color: scheme.surface, width: 2),
+                        ),
+                        child: Icon(Icons.camera_alt,
+                            size: 13, color: scheme.onPrimary),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(width: 20),

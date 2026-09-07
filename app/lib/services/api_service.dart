@@ -477,6 +477,51 @@ class ApiService {
     }
   }
 
+  /// PATCH /auth/profile-picture — uploads or replaces the avatar.
+  ///
+  /// Multipart, like createPost: an image cannot travel in a JSON body.
+  static Future<ApiResult> setProfilePicture(File image) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return ApiResult(ok: false, statusCode: 401, message: 'Not logged in');
+      }
+
+      final request = http.MultipartRequest(
+        'PATCH',
+        Uri.parse('${Config.baseUrl}/auth/profile-picture'),
+      );
+      request.headers['Authorization'] = 'Bearer $token';
+      request.files.add(await http.MultipartFile.fromPath('image', image.path));
+
+      final streamed = await request.send().timeout(
+            const Duration(seconds: 60),
+          );
+      return _result(await http.Response.fromStream(streamed));
+    } catch (e) {
+      return _networkError(e);
+    }
+  }
+
+  /// DELETE /auth/profile-picture — back to the letter initial.
+  static Future<ApiResult> removeProfilePicture() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return ApiResult(ok: false, statusCode: 401, message: 'Not logged in');
+      }
+
+      final res = await http.delete(
+        Uri.parse('${Config.baseUrl}/auth/profile-picture'),
+        headers: {'Authorization': 'Bearer $token'},
+      ).timeout(const Duration(seconds: 20));
+
+      return _result(res);
+    } catch (e) {
+      return _networkError(e);
+    }
+  }
+
   /// PATCH /posts/:id/privacy — makes one post private or public.
   static Future<ApiResult> setPostPrivacy(int postId, bool isPrivate) async {
     try {
