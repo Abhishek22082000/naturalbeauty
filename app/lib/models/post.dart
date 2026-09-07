@@ -30,6 +30,7 @@ class Post {
   final int likeCount;
   final bool isLiked;
   final bool isVerified;
+  final bool isPrivate;
   final DateTime? createdAt;
 
   const Post({
@@ -44,6 +45,7 @@ class Post {
     this.likeCount = 0,
     this.isLiked = false,
     this.isVerified = false,
+    this.isPrivate = false,
     this.createdAt,
   });
 
@@ -61,6 +63,7 @@ class Post {
       // MySQL sends 0/1, not true/false — never compare with == true.
       isLiked: _toInt(json['is_liked']) == 1,
       isVerified: _toInt(json['is_verified']) == 1,
+      isPrivate: _toInt(json['is_private']) == 1,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
           : null,
@@ -74,7 +77,7 @@ class Post {
     return 0;
   }
 
-  Post copyWith({int? likeCount, bool? isLiked}) {
+  Post copyWith({int? likeCount, bool? isLiked, bool? isPrivate}) {
     return Post(
       id: id,
       userId: userId,
@@ -87,6 +90,7 @@ class Post {
       likeCount: likeCount ?? this.likeCount,
       isLiked: isLiked ?? this.isLiked,
       isVerified: isVerified,
+      isPrivate: isPrivate ?? this.isPrivate,
       createdAt: createdAt,
     );
   }

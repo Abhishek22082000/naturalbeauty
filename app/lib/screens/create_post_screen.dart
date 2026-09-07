@@ -18,6 +18,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   File? _image;
   bool _loading = false;
+  bool _isPrivate = false;
   String? _error;
 
   @override
@@ -102,6 +103,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       image: _image!,
       caption: _caption.text.trim(),
       location: _location.text.trim(),
+      isPrivate: _isPrivate,
     );
 
     if (!mounted) return;
@@ -214,6 +216,37 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 decoration: const InputDecoration(
                   labelText: 'Location',
                   prefixIcon: Icon(Icons.location_on_outlined),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              Container(
+                decoration: BoxDecoration(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .surfaceContainerHighest
+                      .withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: SwitchListTile(
+                  value: _isPrivate,
+                  onChanged: _loading
+                      ? null
+                      : (v) => setState(() => _isPrivate = v),
+                  secondary: Icon(
+                    _isPrivate ? Icons.lock_outline : Icons.public,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  title: const Text('Private post'),
+                  subtitle: Text(
+                    _isPrivate
+                        ? 'Only you will see this'
+                        : 'Everyone can see this',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
               ),
 

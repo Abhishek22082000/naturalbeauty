@@ -228,6 +228,7 @@ class ApiService {
     required File image,
     String? caption,
     String? location,
+    bool isPrivate = false,
   }) async {
     try {
       final token = await getToken();
@@ -252,6 +253,8 @@ class ApiService {
       if (location != null && location.isNotEmpty) {
         request.fields['location'] = location;
       }
+      // Multipart fields are strings, which the server parses back.
+      request.fields['is_private'] = isPrivate ? '1' : '0';
 
       final streamed = await request.send().timeout(const Duration(seconds: 60));
       final res = await http.Response.fromStream(streamed);
@@ -443,6 +446,52 @@ class ApiService {
       final res = await http.get(
         Uri.parse('${Config.baseUrl}/auth/me'),
         headers: {'Authorization': 'Bearer $token'},
+      ).timeout(const Duration(seconds: 20));
+
+      return _result(res);
+    } catch (e) {
+      return _networkError(e);
+    }
+  }
+
+  /// PATCH /auth/privacy — makes the whole account private or public.
+  static Future<ApiResult> setAccountPrivacy(bool isPrivate) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return ApiResult(ok: false, statusCode: 401, message: 'Not logged in');
+      }
+
+      final res = await http.patch(
+        Uri.parse('${Config.baseUrl}/auth/privacy'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'is_private': isPrivate}),
+      ).timeout(const Duration(seconds: 20));
+
+      return _result(res);
+    } catch (e) {
+      return _networkError(e);
+    }
+  }
+
+  /// PATCH /posts/:id/privacy — makes one post private or public.
+  static Future<ApiResult> setPostPrivacy(int postId, bool isPrivate) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return ApiResult(ok: false, statusCode: 401, message: 'Not logged in');
+      }
+
+      final res = await http.patch(
+        Uri.parse('${Config.baseUrl}/posts/$postId/privacy'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'is_private': isPrivate}),
       ).timeout(const Duration(seconds: 20));
 
       return _result(res);

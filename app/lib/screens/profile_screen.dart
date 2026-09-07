@@ -25,6 +25,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   /// Posts currently being deleted, so each tile can show its own spinner.
   final Set<int> _deletingIds = {};
 
+  bool get _accountPrivate => (_user?['is_private'] ?? 0) == 1;
+
   @override
   void initState() {
     super.initState();
@@ -115,6 +117,55 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  /// Flips the whole account between private and public.
+  ///
+  /// The account setting is the stricter of the two: while it is on, even
+  /// a post marked public stays hidden from everyone else.
+  Future<void> _toggleAccountPrivacy() async {
+    final next = !_accountPrivate;
+    final result = await ApiService.setAccountPrivacy(next);
+
+    if (!mounted) return;
+
+    if (result.ok) {
+      setState(() => _user = {..._user!, 'is_private': next ? 1 : 0});
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(next
+              ? 'Account is private — only you can see your posts'
+              : 'Account is public'),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(result.message)));
+    }
+  }
+
+  /// Flips one post between private and public.
+  Future<void> _togglePostPrivacy(Post post) async {
+    final next = !post.isPrivate;
+    final index = _posts.indexWhere((p) => p.id == post.id);
+    if (index == -1) return;
+
+    // Optimistic: the lock badge flips at once, and rolls back on failure.
+    setState(() => _posts[index] = post.copyWith(isPrivate: next));
+
+    final result = await ApiService.setPostPrivacy(post.id, next);
+
+    if (!mounted) return;
+
+    if (result.ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(next ? 'Post is private' : 'Post is public')),
+      );
+    } else {
+      setState(() => _posts[index] = post);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(result.message)));
+    }
+  }
+
   /// The name shown in the app bar: full name if set, else the username.
   String get _displayName {
     final full = _user?['full_name']?.toString();
@@ -177,7 +228,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             icon: const Icon(Icons.menu),
             tooltip: 'Menu',
             onSelected: (value) async {
-              if (value == 'server') {
+              if (value == 'privacy') {
+                _toggleAccountPrivacy();
+              } else if (value == 'server') {
                 await Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const ServerScreen()),
                 );
@@ -186,8 +239,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _logout();
               }
             },
-            itemBuilder: (context) => const [
+            itemBuilder: (context) => [
               PopupMenuItem(
+                value: 'privacy',
+                child: ListTile(
+                  leading: Icon(
+                      _accountPrivate ? Icons.lock : Icons.lock_open_outlined),
+                  title: Text(_accountPrivate
+                      ? 'Account is private'
+                      : 'Account is public'),
+                  subtitle: Text(
+                    _accountPrivate ? 'Tap to make public' : 'Tap to make private',
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem(
                 value: 'server',
                 child: ListTile(
                   leading: Icon(Icons.dns_outlined),
@@ -195,7 +264,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
-              PopupMenuItem(
+              const PopupMenuItem(
                 value: 'logout',
                 child: ListTile(
                   leading: Icon(Icons.logout),
@@ -216,6 +285,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
                   SliverToBoxAdapter(child: _header(context)),
+                  if (_accountPrivate)
+                    SliverToBoxAdapter(child: _privateBanner(context)),
                   if (_error != null)
                     SliverFillRemaining(
                       hasScrollBody: false,
@@ -250,6 +321,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             deleting:
                                 _deletingIds.contains(_posts[index].id),
                             onDelete: () => _deletePost(_posts[index]),
+                            onTogglePrivacy: () =>
+                                _togglePostPrivacy(_posts[index]),
                             onTap: () async {
                               await Navigator.of(context).push(
                                 MaterialPageRoute(
@@ -348,6 +421,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Widget _privateBanner(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: scheme.tertiaryContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.lock, size: 18, color: scheme.onTertiaryContainer),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Your account is private. Only you can see these posts, and '
+              'you will not appear on the leaderboard.',
+              style: TextStyle(
+                  fontSize: 12, color: scheme.onTertiaryContainer),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _stat(BuildContext context, String value, String label) {
     final scheme = Theme.of(context).colorScheme;
     return Container(
@@ -411,12 +510,14 @@ class _GridTile extends StatelessWidget {
   final Post post;
   final VoidCallback onTap;
   final VoidCallback onDelete;
+  final VoidCallback onTogglePrivacy;
   final bool deleting;
 
   const _GridTile({
     required this.post,
     required this.onTap,
     required this.onDelete,
+    required this.onTogglePrivacy,
     this.deleting = false,
   });
 
@@ -445,7 +546,27 @@ class _GridTile extends StatelessWidget {
             ),
           ),
 
-          // Scrim behind the icon so it stays legible on a light photo.
+          // A private post is dimmed, so the grid shows at a glance which
+          // posts are hidden.
+          if (post.isPrivate)
+            Container(color: Colors.black.withValues(alpha: 0.35)),
+
+          if (post.isPrivate)
+            Positioned(
+              left: 6,
+              bottom: 6,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Icon(Icons.lock,
+                    size: 13, color: Colors.white),
+              ),
+            ),
+
+          // Scrim behind the icons so they stay legible on a light photo.
           Positioned(
             top: 0,
             right: 0,
@@ -469,13 +590,34 @@ class _GridTile extends StatelessWidget {
                         ),
                       ),
                     )
-                  : IconButton(
-                      icon: const Icon(Icons.delete_outline),
-                      color: Colors.white,
-                      iconSize: 20,
-                      visualDensity: VisualDensity.compact,
-                      tooltip: 'Delete post',
-                      onPressed: onDelete,
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: Icon(post.isPrivate
+                              ? Icons.lock
+                              : Icons.lock_open_outlined),
+                          color: Colors.white,
+                          iconSize: 18,
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.all(6),
+                          constraints: const BoxConstraints(),
+                          tooltip: post.isPrivate
+                              ? 'Make public'
+                              : 'Make private',
+                          onPressed: onTogglePrivacy,
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline),
+                          color: Colors.white,
+                          iconSize: 18,
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.all(6),
+                          constraints: const BoxConstraints(),
+                          tooltip: 'Delete post',
+                          onPressed: onDelete,
+                        ),
+                      ],
                     ),
             ),
           ),

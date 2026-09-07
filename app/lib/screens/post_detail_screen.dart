@@ -52,6 +52,28 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     }
   }
 
+  Future<void> _togglePrivacy() async {
+    final next = !_post.isPrivate;
+    final before = _post;
+
+    setState(() => _post = _post.copyWith(isPrivate: next));
+
+    final result = await ApiService.setPostPrivacy(_post.id, next);
+
+    if (!mounted) return;
+
+    if (!result.ok) {
+      setState(() => _post = before);
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(result.ok
+            ? (next ? 'Post is private' : 'Post is public')
+            : result.message),
+      ),
+    );
+  }
+
   Future<void> _confirmDelete() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -93,6 +115,12 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       appBar: AppBar(
         title: const Text('Post'),
         actions: [
+          IconButton(
+            icon: Icon(
+                _post.isPrivate ? Icons.lock : Icons.lock_open_outlined),
+            tooltip: _post.isPrivate ? 'Make public' : 'Make private',
+            onPressed: _deleting ? null : _togglePrivacy,
+          ),
           IconButton(
             icon: _deleting
                 ? const SizedBox(
