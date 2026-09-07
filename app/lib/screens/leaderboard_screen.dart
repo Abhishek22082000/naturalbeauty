@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../config.dart';
 import '../models/leaderboard_entry.dart';
+import '../models/leaderboard_period.dart';
 import '../services/api_service.dart';
 
 /// Top Natural Beauty — users ranked by average likes per post.
@@ -16,6 +17,19 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   List<LeaderboardEntry> _entries = [];
   bool _loading = true;
   String? _error;
+
+  LeaderboardPeriod _period = LeaderboardPeriod.allTime;
+  String _periodLabel = '';
+
+  /// The fixed chips. A custom month, year or range is appended as an
+  /// extra selected chip so it does not disturb these.
+  static final _presets = <LeaderboardPeriod>[
+    LeaderboardPeriod.allTime,
+    LeaderboardPeriod.today,
+    LeaderboardPeriod.week,
+    LeaderboardPeriod.month(),
+    LeaderboardPeriod.year(),
+  ];
 
   /// Drives the entrance: podium bars grow, rows slide in one after
   /// another. Restarted on every successful load so pull-to-refresh
@@ -45,14 +59,24 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
 
     // minPosts: 1 while the app has few posts — raise it once there is
     // enough data that a single lucky post could distort the ranking.
-    final result = await ApiService.getLeaderboard(limit: 5, minPosts: 1);
+    final result = await ApiService.getLeaderboard(
+      limit: 5,
+      minPosts: 1,
+      period: _period,
+    );
 
     if (!mounted) return;
     setState(() {
       _loading = false;
+      // Prefer the server's label, but fall back to the local one so a
+      // failed request never leaves the previous period's text on screen.
+      _periodLabel = result.periodLabel.isNotEmpty
+          ? result.periodLabel
+          : _period.shortLabel;
       if (result.ok) {
         _entries = result.entries;
       } else {
+        _entries = [];
         _error = result.message;
       }
     });
@@ -61,6 +85,174 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       _entrance.forward(from: 0);
     }
   }
+
+  void _apply(LeaderboardPeriod period) {
+    setState(() => _period = period);
+    _load();
+  }
+
+  /// Month and year pickers, plus a date range - the three custom filters.
+  Future<void> _pickCustom() async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 10),
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 12),
+            ListTile(
+              leading: const Icon(Icons.calendar_view_month),
+              title: const Text('Pick a month'),
+              onTap: () => Navigator.pop(context, 'month'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.calendar_today_outlined),
+              title: const Text('Pick a year'),
+              onTap: () => Navigator.pop(context, 'year'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.date_range),
+              title: const Text('Pick a date range'),
+              onTap: () => Navigator.pop(context, 'range'),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+
+    if (choice == null || !mounted) return;
+
+    switch (choice) {
+      case 'month':
+        await _pickMonth();
+        break;
+      case 'year':
+        await _pickYear();
+        break;
+      case 'range':
+        await _pickRange();
+        break;
+    }
+  }
+
+  Future<void> _pickMonth() async {
+    final now = DateTime.now();
+    var year = _period.year ?? now.year;
+    var month = _period.month ?? now.month;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setLocal) => AlertDialog(
+          title: const Text('Pick a month'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _YearStepper(
+                year: year,
+                onChanged: (v) => setLocal(() => year = v),
+              ),
+              const SizedBox(height: 18),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                alignment: WrapAlignment.center,
+                children: List.generate(12, (i) {
+                  return ChoiceChip(
+                    label: Text(_monthAbbr[i]),
+                    selected: month == i + 1,
+                    onSelected: (_) => setLocal(() => month = i + 1),
+                  );
+                }),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Show'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      _apply(LeaderboardPeriod.month(year: year, month: month));
+    }
+  }
+
+  Future<void> _pickYear() async {
+    var year = _period.year ?? DateTime.now().year;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setLocal) => AlertDialog(
+          title: const Text('Pick a year'),
+          content: _YearStepper(
+            year: year,
+            onChanged: (v) => setLocal(() => year = v),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Show'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      _apply(LeaderboardPeriod.year(year: year));
+    }
+  }
+
+  Future<void> _pickRange() async {
+    final now = DateTime.now();
+    final picked = await showDateRangePicker(
+      context: context,
+      // 2020 is comfortably before any post could exist; the end is today
+      // because a leaderboard for the future would always be empty.
+      firstDate: DateTime(2020),
+      lastDate: now,
+      initialDateRange: _period.from != null && _period.to != null
+          ? DateTimeRange(start: _period.from!, end: _period.to!)
+          : null,
+      helpText: 'Select a date range',
+    );
+
+    if (picked != null && mounted) {
+      _apply(LeaderboardPeriod.range(picked.start, picked.end));
+    }
+  }
+
+  static const _monthAbbr = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -72,58 +264,186 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         ),
         centerTitle: false,
         scrolledUnderElevation: 0.5,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.tune),
+            tooltip: 'Custom period',
+            onPressed: _pickCustom,
+          ),
+        ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _load,
-              child: _error != null
-                  ? _StateMessage(
-                      icon: Icons.cloud_off,
-                      title: "Couldn't load the leaderboard",
-                      detail: _error!,
-                      onRetry: _load,
-                    )
-                  : _entries.isEmpty
-                      ? const _StateMessage(
-                          icon: Icons.emoji_events_outlined,
-                          title: 'No rankings yet',
-                          detail: 'Once people post and like, the top five '
-                              'will appear here.',
-                        )
-                      : ListView(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.only(bottom: 24),
-                          children: [
-                            const _Explainer(),
-                            if (_entries.length >= 3)
-                              _Podium(
-                                entries: _entries,
-                                animation: _entrance,
+      body: Column(
+        children: [
+          // The chips stay put while the list below reloads, so changing
+          // filter does not make the controls jump around.
+          _PeriodChips(
+            presets: _presets,
+            active: _period,
+            onSelect: _apply,
+            onCustom: _pickCustom,
+          ),
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : RefreshIndicator(
+                    onRefresh: _load,
+                    child: _error != null
+                        ? _StateMessage(
+                            icon: Icons.cloud_off,
+                            title: "Couldn't load the leaderboard",
+                            detail: _error!,
+                            onRetry: _load,
+                          )
+                        : _entries.isEmpty
+                            ? _StateMessage(
+                                icon: Icons.emoji_events_outlined,
+                                title: 'Nothing for this period',
+                                detail: _period.type == 'all'
+                                    ? 'Once people post and like, the top '
+                                        'five will appear here.'
+                                    : 'No posts in $_periodLabel. Try a '
+                                        'wider period.',
+                                onRetry: () => _apply(
+                                    LeaderboardPeriod.allTime),
+                                retryLabel: 'Show all time',
+                              )
+                            : ListView(
+                                physics:
+                                    const AlwaysScrollableScrollPhysics(),
+                                padding: const EdgeInsets.only(bottom: 24),
+                                children: [
+                                  _Explainer(periodLabel: _periodLabel),
+                                  if (_entries.length >= 3)
+                                    _Podium(
+                                      entries: _entries,
+                                      animation: _entrance,
+                                    ),
+                                  ..._entries.asMap().entries.map(
+                                        (e) => _Row(
+                                          entry: e.value,
+                                          animation: _entrance,
+                                          position: e.key,
+                                        ),
+                                      ),
+                                ],
                               ),
-                            ..._entries.asMap().entries.map(
-                                  (e) => _Row(
-                                    entry: e.value,
-                                    animation: _entrance,
-                                    position: e.key,
-                                  ),
-                                ),
-                          ],
-                        ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Horizontal row of period chips, ending in a custom option.
+class _PeriodChips extends StatelessWidget {
+  final List<LeaderboardPeriod> presets;
+  final LeaderboardPeriod active;
+  final ValueChanged<LeaderboardPeriod> onSelect;
+  final VoidCallback onCustom;
+
+  const _PeriodChips({
+    required this.presets,
+    required this.active,
+    required this.onSelect,
+    required this.onCustom,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // A custom pick is not in the preset list, so it gets its own chip at
+    // the front rather than leaving nothing highlighted.
+    final isCustom = !presets.any(active.matchesPreset);
+
+    return SizedBox(
+      height: 52,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        children: [
+          if (isCustom)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(
+                label: Text(active.shortLabel),
+                selected: true,
+                avatar: const Icon(Icons.event, size: 17),
+                onSelected: (_) => onCustom(),
+              ),
             ),
+          ...presets.map(
+            (p) => Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(
+                label: Text(p.shortLabel),
+                selected: active.matchesPreset(p),
+                onSelected: (_) => onSelect(p),
+              ),
+            ),
+          ),
+          ActionChip(
+            avatar: const Icon(Icons.tune, size: 17),
+            label: const Text('Custom'),
+            onPressed: onCustom,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A year with arrows either side, used by the month and year pickers.
+class _YearStepper extends StatelessWidget {
+  final int year;
+  final ValueChanged<int> onChanged;
+
+  const _YearStepper({required this.year, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final thisYear = DateTime.now().year;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        IconButton(
+          icon: const Icon(Icons.chevron_left),
+          // 2020 matches the range picker's floor.
+          onPressed: year > 2020 ? () => onChanged(year - 1) : null,
+        ),
+        SizedBox(
+          width: 78,
+          child: Text(
+            '$year',
+            textAlign: TextAlign.center,
+            style: Theme.of(context)
+                .textTheme
+                .headlineSmall
+                ?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.chevron_right),
+          // No future years: a leaderboard ahead of today is always empty.
+          onPressed: year < thisYear ? () => onChanged(year + 1) : null,
+        ),
+      ],
     );
   }
 }
 
 /// Says what the ranking actually measures, so the order is not a mystery.
 class _Explainer extends StatelessWidget {
-  const _Explainer();
+  final String periodLabel;
+
+  const _Explainer({required this.periodLabel});
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      margin: const EdgeInsets.fromLTRB(16, 6, 16, 4),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: scheme.surfaceContainerHighest,
@@ -135,7 +455,9 @@ class _Explainer extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Ranked by average likes per post — quality over quantity.',
+              periodLabel.isEmpty
+                  ? 'Ranked by average likes per post.'
+                  : '$periodLabel  ·  ranked by average likes per post.',
               style: Theme.of(context)
                   .textTheme
                   .bodySmall
@@ -474,12 +796,14 @@ class _StateMessage extends StatelessWidget {
   final String title;
   final String detail;
   final VoidCallback? onRetry;
+  final String retryLabel;
 
   const _StateMessage({
     required this.icon,
     required this.title,
     required this.detail,
     this.onRetry,
+    this.retryLabel = 'Try again',
   });
 
   @override
@@ -513,7 +837,7 @@ class _StateMessage extends StatelessWidget {
             child: FilledButton.icon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh),
-              label: const Text('Try again'),
+              label: Text(retryLabel),
             ),
           ),
         ],

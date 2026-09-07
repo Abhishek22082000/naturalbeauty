@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config.dart';
 import '../models/leaderboard_entry.dart';
+import '../models/leaderboard_period.dart';
 import '../models/post.dart';
 
 /// Result of an API call: either data or an error message.
@@ -29,11 +30,15 @@ class LeaderboardResult {
   final List<LeaderboardEntry> entries;
   final String message;
 
+  /// What the server says the returned slice covers, e.g. "September 2026".
+  final String periodLabel;
+
   LeaderboardResult({
     required this.ok,
     required this.statusCode,
     this.entries = const [],
     this.message = '',
+    this.periodLabel = '',
   });
 }
 
@@ -368,6 +373,7 @@ class ApiService {
   static Future<LeaderboardResult> getLeaderboard({
     int limit = 5,
     int minPosts = 1,
+    LeaderboardPeriod period = LeaderboardPeriod.allTime,
   }) async {
     try {
       final token = await getToken();
@@ -377,18 +383,23 @@ class ApiService {
       }
 
       final res = await http.get(
-        Uri.parse(
-            '${Config.baseUrl}/leaderboard?limit=$limit&minPosts=$minPosts'),
+        Uri.parse('${Config.baseUrl}/leaderboard'
+            '?limit=$limit&minPosts=$minPosts&${period.toQuery()}'),
         headers: {'Authorization': 'Bearer $token'},
       ).timeout(const Duration(seconds: 20));
 
       if (res.statusCode < 200 || res.statusCode >= 300) {
+        // A 400 carries a validation message worth showing verbatim.
+        String detail = 'Could not load leaderboard (${res.statusCode})';
+        if (res.statusCode == 404) {
+          detail = 'Leaderboard endpoint not found — is the server up to date?';
+        } else if (res.statusCode == 400) {
+          detail = _decode(res)['message']?.toString() ?? detail;
+        }
         return LeaderboardResult(
           ok: false,
           statusCode: res.statusCode,
-          message: res.statusCode == 404
-              ? 'Leaderboard endpoint not found — is the server up to date?'
-              : 'Could not load leaderboard (${res.statusCode})',
+          message: detail,
         );
       }
 
@@ -397,9 +408,14 @@ class ApiService {
           ? decoded
           : (decoded['leaderboard'] ?? decoded['data'] ?? []) as List<dynamic>;
 
+      final label = decoded is Map<String, dynamic>
+          ? (decoded['period']?['label']?.toString() ?? '')
+          : '';
+
       return LeaderboardResult(
         ok: true,
         statusCode: res.statusCode,
+        periodLabel: label,
         entries: raw
             .whereType<Map<String, dynamic>>()
             .map(LeaderboardEntry.fromJson)
