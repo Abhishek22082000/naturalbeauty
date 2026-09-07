@@ -338,40 +338,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Flexible(
-                  child: Text(
-                    _displayName,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 19,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if ((_user?['is_verified'] ?? 0) == 1) ...[
-                  const SizedBox(width: 5),
-                  const Icon(Icons.verified,
-                      size: 16, color: Color(0xFF3897F0)),
-                ],
-              ],
-            ),
-            if (_user?['username'] != null)
-              Text(
-                '@${_user!['username']}',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w400,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-          ],
+        title: Text(
+          _displayName,
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 19),
+          overflow: TextOverflow.ellipsis,
         ),
         centerTitle: false,
         scrolledUnderElevation: 0.5,
@@ -456,10 +426,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         title: 'No posts yet',
                         detail: 'Tap Create below to share your first photo',
                       ),
-                    )
-                  else
+                    ),
+                  if (_error == null && _posts.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+                        child: Row(
+                          children: [
+                            Icon(Icons.grid_on,
+                                size: 15,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant),
+                            const SizedBox(width: 7),
+                            Text(
+                              'Posts',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelLarge
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                    letterSpacing: 0.3,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  if (_error == null && _posts.isNotEmpty)
                     SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(12, 4, 12, 20),
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
                       sliver: SliverGrid(
                         gridDelegate:
                             const SliverGridDelegateWithFixedCrossAxisCount(
@@ -601,21 +599,60 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ],
                 ),
               ),
-              const SizedBox(width: 20),
+              const SizedBox(width: 18),
               Expanded(
-                child: Row(
-                  children: [
-                    Expanded(child: _stat(context, '$postCount', 'posts')),
-                    Expanded(child: _stat(context, '0', 'followers')),
-                    Expanded(child: _stat(context, '0', 'following')),
-                  ],
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: scheme.surfaceContainerHighest
+                        .withValues(alpha: 0.45),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _stat(context, '$postCount', 'POSTS'),
+                      _statDivider(context),
+                      _stat(context, '0', 'FOLLOWERS'),
+                      _statDivider(context),
+                      _stat(context, '0', 'FOLLOWING'),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 18),
+
+          // The username reads as the heading here; the app bar carries
+          // the full name.
+          Row(
+            children: [
+              Text(
+                '@$username',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              if ((_user?['is_verified'] ?? 0) == 1) ...[
+                const SizedBox(width: 4),
+                const Icon(Icons.verified,
+                    size: 14, color: Color(0xFF3897F0)),
+              ],
+              const Spacer(),
+              _PrivacyPill(
+                isPrivate: _accountPrivate,
+                onTap: _toggleAccountPrivacy,
+              ),
+            ],
+          ),
+
           if (bio != null && bio.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Text(bio, style: theme.textTheme.bodyMedium),
+            const SizedBox(height: 6),
+            Text(
+              bio,
+              style: theme.textTheme.bodyMedium?.copyWith(height: 1.35),
+            ),
           ],
         ],
       ),
@@ -637,8 +674,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Your account is private. Only you can see these posts, and '
-              'you will not appear on the leaderboard.',
+              'Only you can see these posts, and you are hidden from the '
+              'leaderboard.',
               style: TextStyle(
                   fontSize: 12, color: scheme.onTertiaryContainer),
             ),
@@ -650,32 +687,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _stat(BuildContext context, String value, String label) {
     final scheme = Theme.of(context).colorScheme;
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 3),
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
-          ),
-        ],
-      ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          value,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                height: 1.1,
+              ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+                letterSpacing: 0.2,
+              ),
+        ),
+      ],
     );
   }
+
+  /// A thin vertical rule between the stat columns.
+  Widget _statDivider(BuildContext context) => Container(
+        width: 1,
+        height: 26,
+        color: Theme.of(context).colorScheme.outlineVariant,
+      );
 
   Widget _message({
     required IconData icon,
@@ -706,6 +745,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
+/// A small tappable pill showing whether the account is public or private.
+class _PrivacyPill extends StatelessWidget {
+  final bool isPrivate;
+  final VoidCallback onTap;
+
+  const _PrivacyPill({required this.isPrivate, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final bg = isPrivate ? scheme.tertiaryContainer : scheme.surfaceContainerHighest;
+    final fg = isPrivate ? scheme.onTertiaryContainer : scheme.onSurfaceVariant;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(isPrivate ? Icons.lock : Icons.public, size: 12, color: fg),
+              const SizedBox(width: 5),
+              Text(
+                isPrivate ? 'Private' : 'Public',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: fg,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// One square thumbnail in the profile grid.
 class _GridTile extends StatelessWidget {
   final Post post;
@@ -729,102 +813,153 @@ class _GridTile extends StatelessWidget {
         : '${Config.baseUrl}${post.imageUrl}';
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(14),
       child: GestureDetector(
-      onTap: deleting ? null : onTap,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Container(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            child: Image.network(
-              url,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stack) => Icon(
-                Icons.broken_image_outlined,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+        onTap: deleting ? null : onTap,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Container(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              child: Image.network(
+                url,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stack) => Icon(
+                  Icons.broken_image_outlined,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
-          ),
 
-          // A private post is dimmed, so the grid shows at a glance which
-          // posts are hidden.
-          if (post.isPrivate)
-            Container(color: Colors.black.withValues(alpha: 0.35)),
+            // A private post is dimmed, so the grid shows at a glance
+            // which posts are hidden.
+            if (post.isPrivate)
+              Container(color: Colors.black.withValues(alpha: 0.38)),
 
-          if (post.isPrivate)
+            if (post.isPrivate)
+              Positioned(
+                left: 6,
+                bottom: 6,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.6),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.lock, size: 11, color: Colors.white),
+                      SizedBox(width: 3),
+                      Text(
+                        'Private',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+            // One menu rather than two loose buttons: at grid size the
+            // icons crowded each other and were easy to mis-tap.
             Positioned(
-              left: 6,
-              bottom: 6,
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Icon(Icons.lock,
-                    size: 13, color: Colors.white),
-              ),
-            ),
-
-          // Scrim behind the icons so they stay legible on a light photo.
-          Positioned(
-            top: 0,
-            right: 0,
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topRight,
-                  end: Alignment.bottomLeft,
-                  colors: [Colors.black54, Colors.transparent],
-                ),
-              ),
+              top: 2,
+              right: 2,
               child: deleting
                   ? const Padding(
                       padding: EdgeInsets.all(10),
                       child: SizedBox(
-                        height: 18,
-                        width: 18,
+                        height: 16,
+                        width: 16,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
                           color: Colors.white,
                         ),
                       ),
                     )
-                  : Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: Icon(post.isPrivate
-                              ? Icons.lock
-                              : Icons.lock_open_outlined),
-                          color: Colors.white,
-                          iconSize: 18,
-                          visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.all(6),
-                          constraints: const BoxConstraints(),
-                          tooltip: post.isPrivate
-                              ? 'Make public'
-                              : 'Make private',
-                          onPressed: onTogglePrivacy,
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline),
-                          color: Colors.white,
-                          iconSize: 18,
-                          visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.all(6),
-                          constraints: const BoxConstraints(),
-                          tooltip: 'Delete post',
-                          onPressed: onDelete,
-                        ),
-                      ],
+                  : _TileMenu(
+                      post: post,
+                      onDelete: onDelete,
+                      onTogglePrivacy: onTogglePrivacy,
                     ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The per-tile overflow menu: privacy, then delete.
+class _TileMenu extends StatelessWidget {
+  final Post post;
+  final VoidCallback onDelete;
+  final VoidCallback onTogglePrivacy;
+
+  const _TileMenu({
+    required this.post,
+    required this.onDelete,
+    required this.onTogglePrivacy,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<String>(
+      tooltip: 'Post options',
+      padding: EdgeInsets.zero,
+      // A dark pill behind the dots so they read on a pale photo.
+      icon: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.45),
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(Icons.more_vert, size: 16, color: Colors.white),
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+      ),
+      onSelected: (value) {
+        if (value == 'privacy') {
+          onTogglePrivacy();
+        } else if (value == 'delete') {
+          onDelete();
+        }
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: 'privacy',
+          child: ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(
+              post.isPrivate ? Icons.public : Icons.lock_outline,
+            ),
+            title: Text(post.isPrivate ? 'Make public' : 'Make private'),
+            subtitle: Text(
+              post.isPrivate
+                  ? 'Everyone will see this'
+                  : 'Only you will see this',
+              style: const TextStyle(fontSize: 11),
+            ),
           ),
-        ],
-      ),
-      ),
+        ),
+        const PopupMenuDivider(),
+        const PopupMenuItem(
+          value: 'delete',
+          child: ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.delete_outline, color: Colors.red),
+            title: Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ),
+      ],
     );
   }
 }
