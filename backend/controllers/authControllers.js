@@ -1,3 +1,5 @@
+const fs = require('fs/promises');
+const path = require('path');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const connection = require('../config/connection');
@@ -144,4 +146,103 @@ const setAccountPrivacy = async (req, res) => {
 };
 
 
-module.exports = {login, signup, me, setAccountPrivacy}
+/**
+ * Deletes a file previously saved under /uploads/avatars.
+ *
+ * The stored value is rebuilt from its basename rather than trusted as a
+ * path, so a crafted value like "../../config/connection.js" cannot reach
+ * outside the avatars folder.
+ */
+const removeUpload = async (storedUrl) => {
+    if (!storedUrl || !storedUrl.startsWith('/uploads/avatars/')) return;
+
+    const safeName = path.basename(storedUrl);
+    const filePath = path.join(__dirname, '..', 'uploads', 'avatars', safeName);
+
+    try {
+        await fs.unlink(filePath);
+    } catch (err) {
+        // Already gone is fine; anything else is worth knowing about.
+        if (err.code !== 'ENOENT') {
+            console.error('Could not delete old avatar:', err.message);
+        }
+    }
+};
+
+/**
+ * PATCH /auth/profile-picture - uploads or replaces the caller's avatar.
+ *
+ * The previous file is deleted afterwards, or every change would leave an
+ * orphan on disk. Deletion failures are logged rather than thrown: the new
+ * avatar is already saved, so a stale file is untidy, not broken.
+ */
+const setProfilePicture = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'Image is required' });
+        }
+
+        const newUrl = `/uploads/avatars/${req.file.filename}`;
+
+        const [rows] = await connection.query(
+            'SELECT profile_picture FROM users WHERE id = ?',
+            [req.user.id]
+        );
+        const oldUrl = rows[0] ? rows[0].profile_picture : null;
+
+        await connection.query(
+            'UPDATE users SET profile_picture = ? WHERE id = ?',
+            [newUrl, req.user.id]
+        );
+
+        await removeUpload(oldUrl);
+
+        return res.status(200).json({
+            message: 'Profile picture updated',
+            profile_picture: newUrl
+        });
+
+    } catch (error) {
+        console.error('Error updating profile picture:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
+/**
+ * DELETE /auth/profile-picture - clears the avatar back to the initial.
+ */
+const removeProfilePicture = async (req, res) => {
+    try {
+        const [rows] = await connection.query(
+            'SELECT profile_picture FROM users WHERE id = ?',
+            [req.user.id]
+        );
+
+        if (!rows[0] || !rows[0].profile_picture) {
+            return res.status(404).json({ message: 'No profile picture set' });
+        }
+
+        await connection.query(
+            'UPDATE users SET profile_picture = NULL WHERE id = ?',
+            [req.user.id]
+        );
+
+        await removeUpload(rows[0].profile_picture);
+
+        return res.status(200).json({ message: 'Profile picture removed' });
+
+    } catch (error) {
+        console.error('Error removing profile picture:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
+
+module.exports = {
+    login,
+    signup,
+    me,
+    setAccountPrivacy,
+    setProfilePicture,
+    removeProfilePicture
+}
